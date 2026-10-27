@@ -1,0 +1,47 @@
+{{ nav_html | safe }}
+<header class="completion-sound-page-head">
+  <a href="/settings" aria-label="返回设置">←</a>
+  <div><h1>前台完成提示音</h1></div>
+</header>
+
+<section class="completion-sound-panel" id="completion-sound-panel">
+  <div class="completion-sound-panel-head">
+    <div><b>启用前台提示音</b></div>
+    <label class="completion-sound-switch" aria-label="启用前台完成提示音">
+      <input id="completion-sound-enabled" type="checkbox"><i></i>
+    </label>
+  </div>
+  <div class="completion-sound-controls">
+    <div class="completion-sound-divider"></div>
+    <div class="completion-sound-label"><span>提示音</span><output id="completion-sound-tone-name">清脆</output></div>
+    <div class="completion-sound-tones" role="group" aria-label="选择提示音">
+      <button type="button" data-completion-tone="soft" data-name="柔和"><span>◌</span>柔和</button>
+      <button type="button" data-completion-tone="clear" data-name="清脆"><span>◇</span>清脆</button>
+      <button type="button" data-completion-tone="strong" data-name="明显"><span>◆</span>明显</button>
+    </div>
+    <div class="completion-sound-divider"></div>
+    <label class="completion-sound-label" for="completion-sound-volume">
+      <span>音量</span><output id="completion-sound-volume-value">65%</output>
+    </label>
+    <input id="completion-sound-volume" type="range" min="10" max="100" step="5" value="65">
+    <div class="completion-sound-actions">
+      <button class="secondary" id="completion-sound-test" type="button">试听</button>
+      <button id="completion-sound-save" type="button">保存到这台设备</button>
+    </div>
+    <p class="completion-sound-saved" id="completion-sound-saved" role="status"></p>
+  </div>
+</section>
+
+<details class="completion-sound-rules">
+  <summary>提醒规则</summary>
+  <div><i>1</i><p><b>当前对话完成</b><small>一直停留在当前页面，也只播放一次。</small></p></div>
+  <div><i>2</i><p><b>其他对话完成</b><small>显示打开提示，并播放同一种提示音。</small></p></div>
+  <div><i>✓</i><p><b>只提醒新的完成轮次</b><small>刷新、恢复和同步旧对话不会重复响。</small></p></div>
+</details>
+<button class="completion-sound-simulate" id="completion-sound-simulate" type="button">模拟“当前对话完成”</button>
+<p class="completion-sound-note"><strong>前台为主：</strong>页面必须仍在运行。每台设备首次需点一次“试听”以允许播放；锁屏或浏览器被冻结时仍由现有 ntfy/Android 通知负责，本设置不改变后台声音。</p>
+
+<aside class="completion-sound-preview" id="completion-sound-preview" hidden>
+  <span>✓</span><b>当前对话已经完成</b><em>前台提示</em>
+</aside>
+<script src="{{ static_url('/static/completion-sound-settings.js') }}" defer></script>

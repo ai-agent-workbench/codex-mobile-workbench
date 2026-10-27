@@ -1,0 +1,140 @@
+{
+  "fixtureVersion": 1,
+  "cliVersion": "codex-cli 0.156.0",
+  "serverVersion": "0.156.0",
+  "sourcePackage": "OpenAI standalone release codex-package-x86_64-unknown-linux-musl 0.156.0",
+  "codexSha256": "78a11f06e0a2dda42d13fba1d50dc62e8cbdb2d5f69789722f4d4d99b5cdbe30",
+  "codeModeHostSha256": "a5c727845f8418acfe5a3d0ff05ad892d76545e51834da817cf77d6d83bdeb18",
+  "schemaCommand": "codex app-server generate-json-schema [--experimental] --out DIR",
+  "schemaSha256": "eb1ba91bd0fab656523092f6ed7de3ea7aef278921a650f14dc871ae7dcfaf84",
+  "experimentalSchemaSha256": "655adafa0ccea3d84f30bcbdc74e201fa14511c51e08d0cd024a0280daa8bc60",
+  "initialize": {
+    "requestRequired": [
+      "clientInfo"
+    ],
+    "responseRequired": [
+      "codexHome",
+      "platformFamily",
+      "platformOs",
+      "userAgent"
+    ]
+  },
+  "methods": {
+    "model/list": {
+      "params": [
+        "cursor",
+        "includeHidden",
+        "limit"
+      ],
+      "responseRequired": [
+        "data"
+      ],
+      "itemRequired": [
+        "defaultReasoningEffort",
+        "description",
+        "displayName",
+        "hidden",
+        "id",
+        "isDefault",
+        "model",
+        "supportedReasoningEfforts"
+      ],
+      "effortRequired": [
+        "description",
+        "reasoningEffort"
+      ],
+      "paginationField": "nextCursor"
+    },
+    "skills/list": {
+      "params": [
+        "cwds",
+        "forceReload"
+      ],
+      "responseRequired": [
+        "data"
+      ],
+      "entryRequired": [
+        "cwd",
+        "errors",
+        "skills"
+      ],
+      "skillRequired": [
+        "description",
+        "enabled",
+        "name",
+        "path",
+        "scope"
+      ]
+    },
+    "thread/start": {
+      "dynamicToolRequired": [
+        "description",
+        "inputSchema",
+        "name",
+        "type"
+      ],
+      "params": [
+        "approvalPolicy",
+        "cwd",
+        "dynamicTools",
+        "model",
+        "sandbox",
+        "config"
+      ]
+    },
+    "thread/settings/update": {
+      "params": [
+        "serviceTier",
+        "threadId"
+      ],
+      "responseEquals": {}
+    },
+    "thread/turns/list": {
+      "params": [
+        "cursor",
+        "itemsView",
+        "limit",
+        "sortDirection",
+        "threadId"
+      ],
+      "responseRequired": [
+        "data"
+      ],
+      "turnRequired": [
+        "id",
+        "items",
+        "itemsView",
+        "status"
+      ],
+      "paginationField": "nextCursor"
+    },
+    "item/tool/call": {
+      "requestRequired": [
+        "arguments",
+        "callId",
+        "threadId",
+        "tool",
+        "turnId"
+      ],
+      "responseRequired": [
+        "contentItems",
+        "success"
+      ]
+    },
+    "turn/input/skill": {
+      "required": [
+        "name",
+        "path",
+        "type"
+      ]
+    },
+    "thread/resume": {
+      "params": [
+        "config",
+        "threadId"
+      ]
+    }
+  },
+  "sourceOrigin": "github.com/openai/codex official release, archive SHA-256 verified",
+  "requestUserInputDefaultModeConfig": true
+}

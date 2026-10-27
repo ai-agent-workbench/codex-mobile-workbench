@@ -1,0 +1,53 @@
+{{ nav_html | safe }}
+<header class="tts-page-head">
+  <a href="/settings" aria-label="返回设置">←</a>
+  <div><h1>回复朗读（TTS）</h1></div>
+</header>
+
+<section class="tts-summary" id="tts-summary">
+  <div><b id="tts-summary-title">正在检查朗读能力…</b>
+    <small id="tts-summary-detail">这里只使用浏览器和手机系统提供的 TTS，不接入工作台云端语音。</small></div>
+  <span id="tts-support-badge">检查中</span>
+</section>
+
+<section class="tts-panel">
+  <label for="tts-voice">朗读音色</label>
+  <select id="tts-voice">
+    <option value="">跟随 Android 系统默认（推荐）</option>
+  </select>
+
+  <div class="tts-range-row"><label for="tts-rate">播放速度</label><output id="tts-rate-value">0.95×</output></div>
+  <input id="tts-rate" type="range" min="0.70" max="1.50" step="0.05" value="0.95">
+  <div class="tts-range-row"><label for="tts-pitch">音调</label><output id="tts-pitch-value">1.00</output></div>
+  <input id="tts-pitch" type="range" min="0.70" max="1.30" step="0.05" value="1.00">
+
+  <div class="tts-actions">
+    <button class="secondary" id="tts-refresh-voices" type="button">刷新音色</button>
+    <button class="secondary" id="tts-test" type="button">试听</button>
+    <button id="tts-save" type="button">保存到这台设备</button>
+  </div>
+  <p class="tts-status" id="tts-status" role="status" aria-live="polite"></p>
+</section>
+
+<h2 class="tts-section-title">当前诊断</h2>
+<section class="tts-diagnostics">
+  <dl>
+    <dt>Web Speech</dt><dd id="tts-diagnostic-support">检查中</dd>
+    <dt>当前模式</dt><dd id="tts-diagnostic-mode">系统默认</dd>
+    <dt>浏览器音色</dt><dd id="tts-diagnostic-voices">读取中</dd>
+    <dt>最近结果</dt><dd id="tts-diagnostic-result">尚未试听</dd>
+  </dl>
+  <button class="secondary" id="tts-copy-diagnostics" type="button">复制排查信息</button>
+</section>
+
+<details class="tts-system-path">
+  <summary>音色与系统设置</summary>
+  <p class="tts-help">选择“系统默认”时，工作台不会设置 <code>utterance.voice</code>。因此您在 Android 中更换的默认 TTS 引擎可以接管朗读；网页无法读取引擎包名。</p>
+  <b>Android 系统设置路径</b>
+  <p>系统设置 → 系统/更多设置 → 语言与输入法 → 文字转语音输出。不同手机名称可能略有差别。</p>
+  <p>工作台本身不会把朗读文字提交给工作台云端语音；浏览器或所选系统 TTS 引擎是否联网，网页无法强制。选择已安装的 sherpa-onnx/Baker 本机音色，才是您当前的离线方案。</p>
+  <p>切换默认引擎后，请彻底关闭 Chrome 或工作台 PWA 再重新打开，然后在本页选择“系统默认”试听。系统默认试听正常，才能确认 Baker 等新音色已被调用。</p>
+</details>
+
+<script src="{{ static_url('/static/tts.js') }}" defer></script>
+<script src="{{ static_url('/static/tts-settings.js') }}" defer></script>

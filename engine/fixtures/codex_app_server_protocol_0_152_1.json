@@ -1,0 +1,61 @@
+{
+  "fixtureVersion": 1,
+  "cliVersion": "codex-cli 0.152.1",
+  "serverVersion": "0.152.1",
+  "sourcePackage": "@openai/codex@0.152.1-linux-x64",
+  "sourceIntegrity": "sha512-ar59rr3CX5j4MLMnRcHqcE0eHZPsZlmXlz37ZS2yP3BsV5pNhO+wFXTOzXFdaYmg2cALX7a3Eqv+vB2jQlXnjQ==",
+  "codexSha256": "b82018241214a4a7c6b97b198585192d1dbc3aab1ddcdc640f04d8dee8c606f9",
+  "codeModeHostSha256": "681833a32394f5aa64eaf3f2fff0f1aede28bf9a93e92b9783d3486a06429f65",
+  "schemaCommand": "codex app-server generate-json-schema [--experimental] --out DIR",
+  "schemaSha256": "d8faa38d5f00aa7ddfe635a2d374ee5f871ffd217d4d175c72fbe7f009f4f669",
+  "experimentalSchemaSha256": "65ce2db95109ebedc995d0ff74cc8bcefaa69fc3270f65b4fc69c1877c651f4e",
+  "initialize": {
+    "requestRequired": ["clientInfo"],
+    "responseRequired": ["codexHome", "platformFamily", "platformOs", "userAgent"]
+  },
+  "methods": {
+    "model/list": {
+      "params": ["cursor", "includeHidden", "limit"],
+      "responseRequired": ["data"],
+      "itemRequired": [
+        "defaultReasoningEffort",
+        "description",
+        "displayName",
+        "hidden",
+        "id",
+        "isDefault",
+        "model",
+        "supportedReasoningEfforts"
+      ],
+      "effortRequired": ["description", "reasoningEffort"],
+      "paginationField": "nextCursor"
+    },
+    "skills/list": {
+      "params": ["cwds", "forceReload"],
+      "responseRequired": ["data"],
+      "entryRequired": ["cwd", "errors", "skills"],
+      "skillRequired": ["description", "enabled", "name", "path", "scope"]
+    },
+    "thread/start": {
+      "dynamicToolRequired": ["description", "inputSchema", "name", "type"],
+      "params": ["approvalPolicy", "cwd", "dynamicTools", "model", "sandbox"]
+    },
+    "thread/settings/update": {
+      "params": ["serviceTier", "threadId"],
+      "responseEquals": {}
+    },
+    "thread/turns/list": {
+      "params": ["cursor", "itemsView", "limit", "sortDirection", "threadId"],
+      "responseRequired": ["data"],
+      "turnRequired": ["id", "items", "itemsView", "status"],
+      "paginationField": "nextCursor"
+    },
+    "item/tool/call": {
+      "requestRequired": ["arguments", "callId", "threadId", "tool", "turnId"],
+      "responseRequired": ["contentItems", "success"]
+    },
+    "turn/input/skill": {
+      "required": ["name", "path", "type"]
+    }
+  }
+}

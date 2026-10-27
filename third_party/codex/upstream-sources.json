@@ -1,0 +1,142 @@
+[
+  {
+    "version": "0.151.0-alpha.7.2",
+    "official_tag": "rust-v0.151.0-alpha.7.2",
+    "files": [
+      {
+        "file": "third_party/codex/0.151.0-alpha.7.2-LICENSE",
+        "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
+        "source_url": "https://api.github.com/repos/openai/codex/contents/LICENSE?ref=rust-v0.151.0-alpha.7.2",
+        "fetched_at": "2026-10-26T12:08:45.863478+00:00",
+        "git_blob_sha1_verified": true
+      },
+      {
+        "file": "third_party/codex/0.151.0-alpha.7.2-NOTICE",
+        "sha256": "9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915",
+        "source_url": "https://api.github.com/repos/openai/codex/contents/NOTICE?ref=rust-v0.151.0-alpha.7.2",
+        "fetched_at": "2026-10-26T12:08:46.725296+00:00",
+        "git_blob_sha1_verified": true
+      }
+    ]
+  },
+  {
+    "version": "0.152.1",
+    "official_tag": "rust-v0.152.1",
+    "files": [
+      {
+        "file": "third_party/codex/0.152.1-LICENSE",
+        "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
+        "source_url": "https://api.github.com/repos/openai/codex/contents/LICENSE?ref=rust-v0.152.1",
+        "fetched_at": "2026-10-26T11:11:58.584780+00:00",
+        "git_blob_sha1_verified": true
+      },
+      {
+        "file": "third_party/codex/0.152.1-NOTICE",
+        "sha256": "9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915",
+        "source_url": "https://api.github.com/repos/openai/codex/contents/NOTICE?ref=rust-v0.152.1",
+        "fetched_at": "2026-10-26T11:11:59.317569+00:00",
+        "git_blob_sha1_verified": true
+      }
+    ]
+  },
+  {
+    "version": "0.153.1",
+    "official_tag": "rust-v0.153.1",
+    "files": [
+      {
+        "file": "third_party/codex/0.153.1-LICENSE",
+        "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
+        "source_url": "https://api.github.com/repos/openai/codex/contents/LICENSE?ref=rust-v0.153.1",
+        "fetched_at": "2026-10-26T11:12:00.960264+00:00",
+        "git_blob_sha1_verified": true
+      },
+      {
+        "file": "third_party/codex/0.153.1-NOTICE",
+        "sha256": "9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915",
+        "source_url": "https://api.github.com/repos/openai/codex/contents/NOTICE?ref=rust-v0.153.1",
+        "fetched_at": "2026-10-26T11:12:01.727060+00:00",
+        "git_blob_sha1_verified": true
+      }
+    ]
+  },
+  {
+    "version": "0.154.0",
+    "official_tag": "rust-v0.154.0",
+    "files": [
+      {
+        "file": "third_party/codex/0.154.0-LICENSE",
+        "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
+        "source_url": "https://api.github.com/repos/openai/codex/contents/LICENSE?ref=rust-v0.154.0",
+        "fetched_at": "2026-10-26T11:12:03.583429+00:00",
+        "git_blob_sha1_verified": true
+      },
+      {
+        "file": "third_party/codex/0.154.0-NOTICE",
+        "sha256": "9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915",
+        "source_url": "https://api.github.com/repos/openai/codex/contents/NOTICE?ref=rust-v0.154.0",
+        "fetched_at": "2026-10-26T11:12:04.341891+00:00",
+        "git_blob_sha1_verified": true
+      }
+    ]
+  },
+  {
+    "version": "0.156.0",
+    "official_tag": "rust-v0.156.0",
+    "files": [
+      {
+        "file": "third_party/codex/0.156.0-LICENSE",
+        "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
+        "source_url": "https://api.github.com/repos/openai/codex/contents/LICENSE?ref=rust-v0.156.0",
+        "fetched_at": "2026-10-26T11:12:06.023268+00:00",
+        "git_blob_sha1_verified": true
+      },
+      {
+        "file": "third_party/codex/0.156.0-NOTICE",
+        "sha256": "9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915",
+        "source_url": "https://api.github.com/repos/openai/codex/contents/NOTICE?ref=rust-v0.156.0",
+        "fetched_at": "2026-10-26T11:12:06.800372+00:00",
+        "git_blob_sha1_verified": true
+      }
+    ]
+  },
+  {
+    "version": "0.159.2",
+    "official_tag": "rust-v0.159.2",
+    "files": [
+      {
+        "file": "third_party/codex/0.159.2-LICENSE",
+        "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
+        "source_url": "https://api.github.com/repos/openai/codex/contents/LICENSE?ref=rust-v0.159.2",
+        "fetched_at": "2026-10-26T11:12:08.466444+00:00",
+        "git_blob_sha1_verified": true
+      },
+      {
+        "file": "third_party/codex/0.159.2-NOTICE",
+        "sha256": "9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915",
+        "source_url": "https://api.github.com/repos/openai/codex/contents/NOTICE?ref=rust-v0.159.2",
+        "fetched_at": "2026-10-26T11:12:09.200871+00:00",
+        "git_blob_sha1_verified": true
+      }
+    ]
+  },
+  {
+    "version": "0.160.0",
+    "official_tag": "rust-v0.160.0",
+    "files": [
+      {
+        "file": "third_party/codex/0.160.0-LICENSE",
+        "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
+        "source_url": "https://api.github.com/repos/openai/codex/contents/LICENSE?ref=rust-v0.160.0",
+        "fetched_at": "2026-10-26T11:12:10.775443+00:00",
+        "git_blob_sha1_verified": true
+      },
+      {
+        "file": "third_party/codex/0.160.0-NOTICE",
+        "sha256": "9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915",
+        "source_url": "https://api.github.com/repos/openai/codex/contents/NOTICE?ref=rust-v0.160.0",
+        "fetched_at": "2026-10-26T11:12:11.655564+00:00",
+        "git_blob_sha1_verified": true
+      }
+    ]
+  }
+]

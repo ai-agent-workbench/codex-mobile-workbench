@@ -1,0 +1,34 @@
+{{ nav_html | safe }}
+<div class="notifications-page">
+  <header class="notifications-page-head">
+    <a href="/settings" aria-label="返回设置" class="notifications-back">←</a>
+    <div><h1>通知设置</h1></div>
+  </header>
+
+  {% if web_push_admin %}
+  <section class="notification-status-card" aria-labelledby="web-push-heading">
+    <span class="notification-status-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg></span>
+    <div class="notification-status-copy">
+      <h2 id="web-push-heading">后台系统通知</h2>
+    </div>
+    <button type="button" id="web-push-toggle" data-enabled="false">开启系统通知</button>
+    <p class="notification-status-note" id="web-push-status" role="status">尚未启用此设备的系统通知。</p>
+  </section>
+  <script src="{{ static_url('/static/web-push-settings.js') }}" defer></script>
+  {% endif %}
+
+  <section class="notification-rules" aria-labelledby="notification-rules-heading">
+    <h2 id="notification-rules-heading">哪些情况会提醒</h2>
+    <div class="notification-rule-row">
+      <span class="notification-rule-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg></span>
+      <span><b>任务完成</b><small>在每条对话里单独开启“完成后通知”。</small></span>
+      <em>按对话</em>
+    </div>
+    <div class="notification-rule-row">
+      <span class="notification-rule-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5c0 4.6 2.9 8 7 10 4.1-2 7-5.4 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+      <span><b>安全事件</b><small>由 ntfy 自动提醒；登录失败、身份验证器启用、文件删除或门店账号锁定、解锁状态变化不受此设备开关影响。</small></span>
+      <em class="accent">自动</em>
+    </div>
+  </section>
+  <p class="notifications-footnote">订阅和浏览器权限不等于保证送达；网络、系统省电和浏览器状态都可能影响通知。</p>
+</div>

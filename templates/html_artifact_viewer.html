@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#070b10">
+  <title>受限预览 · {{ artifact_name }}</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #070b10; color: #f6f8fb; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; min-height: 100%; margin: 0; background: #070b10; }
+    .artifact-viewer { position: fixed; inset: 0; display: grid; min-width: 0; max-width: 100%; grid-template-rows: auto auto minmax(0, 1fr); background: #070b10; overflow: hidden; }
+    .artifact-viewer-head { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; min-height: calc(56px + env(safe-area-inset-top)); padding: calc(8px + env(safe-area-inset-top)) 10px 8px; background: #101722; overflow: hidden; }
+    .artifact-viewer-head strong { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .92rem; }
+    .artifact-viewer-back, .artifact-viewer-download { display: grid; place-items: center; min-width: 44px; min-height: 40px; padding: 0 11px; border: 0; border-radius: 10px; background: #28323f; color: #fff; font: inherit; font-size: .78rem; font-weight: 650; text-decoration: none; }
+    .artifact-viewer-back { font-size: 1.35rem; }
+    .artifact-viewer-notice { margin: 0; padding: 8px 12px; border-bottom: 1px solid #6a562e; background: #352b18; color: #f1d99d; font-size: .72rem; line-height: 1.4; text-align: center; }
+    .artifact-viewer-frame { width: 100%; max-width: 100%; height: 100%; min-width: 0; min-height: 0; border: 0; background: #fff; }
+  </style>
+</head>
+<body>
+  <main class="artifact-viewer">
+    <header class="artifact-viewer-head">
+      <button class="artifact-viewer-back" id="artifact-viewer-back" type="button" aria-label="返回对话">‹</button>
+      <strong id="artifact-viewer-title">{{ artifact_name }}</strong>
+      <a class="artifact-viewer-download" id="artifact-viewer-download" download>下载</a>
+    </header>
+    <p class="artifact-viewer-notice">受限预览：已隔离工作台数据并限制外部资源；请勿在草图内输入敏感信息。</p>
+    <iframe class="artifact-viewer-frame" id="artifact-viewer-html-frame" title="HTML 附件受限预览" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe>
+  </main>
+  <script>
+    (function () {
+      'use strict';
+      var viewerPath = location.pathname;
+      var prefixMatch = viewerPath.match(/^\/[0-9a-f]{40}(?=\/|$)/i);
+      var publicPrefix = prefixMatch ? prefixMatch[0] : '';
+      var appPath = publicPrefix ? viewerPath.slice(publicPrefix.length) : viewerPath;
+      var artifactPath = appPath.replace(/\/preview$/, '');
+      var conversationPath = artifactPath.replace(/\/artifact\/[^/]+$/, '');
+      var backUrl = publicPrefix + conversationPath;
+      var rawPreviewUrl = publicPrefix + appPath;
+      var downloadUrl = publicPrefix + artifactPath + '?download=1';
+      var frame = document.getElementById('artifact-viewer-html-frame');
+      var download = document.getElementById('artifact-viewer-download');
+      var back = document.getElementById('artifact-viewer-back');
+
+      frame.src = rawPreviewUrl;
+      download.href = downloadUrl;
+      back.addEventListener('click', function () { location.replace(backUrl); });
+    }());
+  </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+{# No external dependency, IndexedDB, network request, or continuous heartbeat. #}
+<script>
+(function () {
+  'use strict';
+  if (window.CodexBootTrace) return;
+  var key = 'codex-startup-v1', limit = 12288, records = [], subscriber = null, seq = 0;
+  var idPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,159}$/;
+  function uid() { try { return crypto.randomUUID(); } catch (_) { return 'boot-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2); } }
+  function path(value) { try { var u=new URL(String(value || '').slice(0,1024),location.href); if(!/^https?:$/.test(u.protocol))return '[non-http]'; return u.pathname.replace(/^\/[A-Za-z0-9_-]{24,}(?=\/|$)/, '/[ENTRY]').slice(0,256); } catch(_){return '[invalid-path]';} }
+  var state = {page_id: uid(), path: path(location.pathname), phase: 'bootstrap', ts: new Date().toISOString(), visibility: document.visibilityState, version: 'startup-v1'};
+  function event(type, data) { return {event_id: uid(), ts: new Date().toISOString(), type: type, page_id: state.page_id, tab_id: state.page_id, action_id: state.page_id, seq: ++seq, data: data}; }
+  function keep(value) {
+    if (!value || !idPattern.test(value.event_id || '') || !idPattern.test(value.page_id || '') || typeof value.ts !== 'string' || value.ts.length > 64 || !Number.isSafeInteger(value.seq) || value.seq < 0) return null;
+    if (!['page_show', 'page_load', 'page_hide', 'visibility', 'js_error', 'unhandled_rejection', 'resource_error', 'gap'].includes(value.type)) return null;
+    var data = {context: 'startup'}, source = value.data || {};
+    ['phase', 'reason', 'visibility', 'version', 'previous_phase', 'previous_ts', 'page_id'].forEach(function (name) { if (typeof source[name] === 'string') data[name] = source[name].slice(0, 160); });
+    ['path', 'url'].forEach(function (name) { if (typeof source[name] === 'string') data[name] = path(source[name]); });
+    ['persisted', 'was_discarded'].forEach(function (name) { if (typeof source[name] === 'boolean') data[name] = source[name]; });
+    ['count', 'line_number', 'column_number'].forEach(function (name) { if (Number.isFinite(source[name])) data[name] = source[name]; });
+    return {event_id: value.event_id, ts: value.ts, type: value.type, page_id: value.page_id, tab_id: value.page_id, action_id: value.page_id, seq: value.seq, data: data};
+  }
+  var previous = null;
+  try {
+    var raw = sessionStorage.getItem(key);
+    if (raw && raw.length <= limit) previous = JSON.parse(raw);
+    if (previous && Array.isArray(previous.events)) records = previous.events.slice(-32).map(keep).filter(Boolean);
+  } catch (_) {}
+  function save() {
+    var dropped = 0, encoded;
+    while (records.length > 31) { records.shift(); dropped++; }
+    encoded = JSON.stringify(Object.assign({}, state, {events: records}));
+    while (encoded.length > limit - 600 && records.length) { records.shift(); dropped++; encoded = JSON.stringify(Object.assign({}, state, {events: records})); }
+    if (dropped) {
+      var gap = event('gap', {context: 'startup', reason: 'startup_queue_capacity', count: dropped});
+      records.push(gap);
+      if (subscriber) { try { subscriber(gap); } catch (_) {} }
+    }
+    try { sessionStorage.setItem(key, JSON.stringify(Object.assign({}, state, {events: records}))); } catch (_) {}
+  }
+  function mark(phase, detail, type) {
+    state.phase = phase; state.ts = new Date().toISOString(); state.visibility = document.visibilityState;
+    var data = Object.assign({context: 'startup', phase: phase, path: state.path, visibility: state.visibility, version: state.version}, detail || {});
+    var record = event(type || 'page_show', data); records.push(record); save();
+    if (subscriber) { try { subscriber(record); } catch (_) {} }
+  }
+  window.CodexBootTrace = {
+    pageId: state.page_id,
+    snapshot: function () { return Object.assign({}, state); },
+    subscribe: function (fn) { subscriber = fn; records.slice().forEach(function (record) { try { fn(record); } catch (_) {} }); },
+    acknowledge: function (ids) { var done = new Set(ids); records = records.filter(function (record) { return !done.has(record.event_id); }); save(); }
+  };
+  // Missing pagehide is only an observation gap: background discard, process
+  // death, or an ordinary browser action can all leave the same marker.
+  if (previous && idPattern.test(previous.page_id || '') && typeof previous.phase === 'string' && !/^pagehide/.test(previous.phase)) {
+    mark('previous_session_unobserved', {page_id: previous.page_id, previous_phase: previous.phase.slice(0, 64), previous_ts: String(previous.ts || '').slice(0, 64), reason: 'end_not_observed'});
+  }
+  mark('bootstrap', {was_discarded: document.wasDiscarded === true});
+  document.addEventListener('DOMContentLoaded', function () { mark('dom_ready'); }, {once: true});
+  window.addEventListener('load', function () { mark('load'); }, {once: true});
+  window.addEventListener('pageshow', function (e) { mark('pageshow', {persisted: e.persisted}); });
+  window.addEventListener('pagehide', function (e) { mark('pagehide', {persisted: e.persisted}, 'page_hide'); });
+  document.addEventListener('visibilitychange', function () { mark(document.hidden ? 'hidden' : 'visible', {}, 'visibility'); });
+  window.addEventListener('error', function (e) {
+    if (subscriber) return;
+    if (e.target && e.target !== window) mark('early_resource_error', {reason: String(e.target.tagName || '').slice(0, 32)}, 'resource_error');
+    else mark('early_script_error', {reason: String(e.error && e.error.name || 'Error').slice(0, 64), url: path(e.filename), line_number: e.lineno, column_number: e.colno}, 'js_error');
+  }, true);
+  window.addEventListener('unhandledrejection', function () { if (!subscriber) mark('early_unhandled_rejection', {reason: 'promise_rejected'}, 'unhandled_rejection'); });
+})();
+</script>

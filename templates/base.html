@@ -1,0 +1,12 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#151925"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="工作台"><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png"><link rel="apple-touch-icon" href="/static/icon-192.png"><title>{{ title }}</title>{% include "_startup.html" %}<script src="{{ static_url('/static/diagnostics.js') }}" async fetchpriority="low"></script><script src="{{ static_url('/static/reading-preferences.js') }}" async></script><link rel="stylesheet" href="{{ static_url('/static/css/app.css') }}"><link rel="stylesheet" href="{{ static_url('/static/css/skill-picker.css') }}"><script src="{{ static_url('/static/skill-picker.js') }}" defer></script><script src="{{ static_url('/static/reconnect-coordinator.js') }}" defer></script><script src="{{ static_url('/static/completion-sound.js') }}" defer></script><script src="{{ static_url('/static/light-dismiss.js') }}" defer></script></head>
+<body>
+<script src="{{ static_url('/static/auth-recovery.js') }}" defer></script>
+  <main>
+    {{ content | safe }}
+  </main>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js",{updateViaCache:"none"}).catch(function(){});}</script>
+<script src="{{ static_url('/static/behavior.js') }}" defer></script>
+<script src="{{ static_url('/static/draft.js') }}" defer></script>
+<script src="{{ static_url('/static/setting-segments.js') }}" defer></script>
+<script src="{{ static_url('/static/file-actions.js') }}" defer></script>
+</body></html>

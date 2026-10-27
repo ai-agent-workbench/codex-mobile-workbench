@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111620">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link id="admin-pwa-manifest" rel="manifest">
+  <script>(function(){var p=location.pathname,m=document.getElementById("admin-pwa-manifest");m.href=p+"?pwa=manifest&entry="+encodeURIComponent(p)})();</script>
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <meta name="robots" content="noindex,nofollow">
+  <title>{{ title }} — Codex 工作台</title>
+  <style>
+    *{box-sizing:border-box}
+    :root{color-scheme:dark;--page:#111620;--surface:#171d29;--line:#354052;--text:#f2f4f7;--muted:#9da8ba;--accent:#59ddc1;--shadow:0 18px 48px rgba(0,0,0,.28)}
+    body{margin:0;min-height:100vh;background:radial-gradient(80% 55% at 90% -10%,rgba(89,221,193,.15),transparent 68%),var(--page);color:var(--text);font:16px system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5}
+    .screen{display:grid;place-items:center;min-height:100vh;padding:24px}
+    main{width:min(400px,100%);padding:34px 24px 30px;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);text-align:center}
+    .brand{display:flex;justify-content:center;align-items:center;gap:9px;margin:0 0 56px;color:var(--muted);font-size:.76rem;font-weight:750;letter-spacing:.14em;text-transform:uppercase}
+    .brand-dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 6px rgba(89,221,193,.1)}
+    h1{margin:0 0 36px;font-size:1.45rem;line-height:1.25;letter-spacing:-.03em}
+    .fingerprint-action{display:inline-flex;flex-direction:column;align-items:center;gap:18px;padding:0;border:0;background:transparent;color:var(--text);font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    .fingerprint-pad{position:relative;display:grid;place-items:center;width:142px;height:142px;border:1px solid rgba(89,221,193,.42);border-radius:50%;background:radial-gradient(circle at 50% 48%,rgba(89,221,193,.2),rgba(89,221,193,.08) 54%,rgba(89,221,193,.02) 72%);box-shadow:0 0 0 12px rgba(89,221,193,.035),0 0 48px rgba(89,221,193,.13),inset 0 0 28px rgba(89,221,193,.08);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+    .fingerprint-pad::before,.fingerprint-pad::after{content:"";position:absolute;border:1px solid rgba(89,221,193,.12);border-radius:50%;pointer-events:none}
+    .fingerprint-pad::before{inset:12px}.fingerprint-pad::after{inset:24px}
+    .fingerprint-action:hover .fingerprint-pad,.fingerprint-action:focus-visible .fingerprint-pad{border-color:rgba(89,221,193,.8);box-shadow:0 0 0 12px rgba(89,221,193,.055),0 0 58px rgba(89,221,193,.24),inset 0 0 32px rgba(89,221,193,.12)}
+    .fingerprint-action:active .fingerprint-pad{transform:scale(.96);box-shadow:0 0 0 16px rgba(89,221,193,.055),0 0 68px rgba(89,221,193,.3),inset 0 0 38px rgba(89,221,193,.18)}
+    .fingerprint-action[disabled]{cursor:wait;opacity:.7}
+    .fingerprint-icon{position:relative;z-index:1;width:76px;height:76px;color:var(--accent);filter:drop-shadow(0 0 10px rgba(89,221,193,.22))}
+    .action-label{color:var(--accent);font-size:.94rem;font-weight:750;letter-spacing:.04em}
+    @media(max-width:640px){.screen{padding:0}main{display:flex;flex-direction:column;justify-content:flex-start;min-height:100vh;padding:82px 24px 32px;border:0;border-radius:0;box-shadow:none}.brand{margin-bottom:112px}h1{margin-bottom:44px}}
+    @media(prefers-reduced-motion:no-preference){.fingerprint-pad{animation:breathe 2.8s ease-in-out infinite}@keyframes breathe{50%{box-shadow:0 0 0 16px rgba(89,221,193,.045),0 0 58px rgba(89,221,193,.2),inset 0 0 32px rgba(89,221,193,.12)}}}
+  </style>
+{% include "_startup.html" %}<script src="{{ static_url('/static/diagnostics.js') }}" async fetchpriority="low"></script></head>
+<body data-mode="{{ mode }}" data-action="{{ action }}" data-return-to="{{ return_to }}">
+  <section class="screen">
+    <main>
+      <div class="brand"><span class="brand-dot"></span>Codex 工作台</div>
+      <h1>{{ title }}</h1>
+      <button class="fingerprint-action" type="button" aria-label="{{ action }}">
+        <span class="fingerprint-pad" aria-hidden="true">
+          <svg class="fingerprint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 11a1 1 0 0 0-1 1c0 2.1-.35 4.03-1.22 5.92"/>
+            <path d="M14.8 20.1A13.45 13.45 0 0 0 16 12a4 4 0 0 0-8 0 15.9 15.9 0 0 1-.88 5.3"/>
+            <path d="M17.85 18.2A16.8 16.8 0 0 0 19 12a7 7 0 0 0-14 0c0 1.42-.16 2.83-.48 4.2"/>
+            <path d="M20.45 15.1c.2-1.02.3-2.06.3-3.1a8.75 8.75 0 0 0-17.5 0c0 .57-.03 1.14-.1 1.7"/>
+            <path d="M7.1 21c1.8-2.45 2.65-5.35 2.65-9a2.25 2.25 0 0 1 4.5 0c0 3.6-.55 6.48-1.72 8.8"/>
+            <path d="M17.35 5.35A7.2 7.2 0 0 0 12 3.25a7.2 7.2 0 0 0-5.35 2.1"/>
+          </svg>
+        </span>
+        <span class="action-label">{{ action }}</span>
+      </button>
+    </main>
+  </section>
+  <script src="{{ static_url('/static/passkey.js') }}"></script>
+  <script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/sw.js",{updateViaCache:"none"}).catch(function(){});}</script>
+</body>
+</html>

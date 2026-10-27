@@ -1,0 +1,56 @@
+{
+  "fixtureVersion": 1,
+  "cliVersion": "codex-cli 0.151.0-alpha.7.2",
+  "serverVersion": "0.151.0-alpha.7.2",
+  "schemaSha256": "424b204943b18e5ffa52667a2aa397c9950730ec1e49ad767e2a016743990541",
+  "experimentalSchemaSha256": "31ae67beb2c94cc9509f6a71968600062dc8c6d7fe45437ed3a9129838f4d2d9",
+  "initialize": {
+    "requestRequired": ["clientInfo"],
+    "responseRequired": ["codexHome", "platformFamily", "platformOs", "userAgent"]
+  },
+  "methods": {
+    "model/list": {
+      "params": ["cursor", "includeHidden", "limit"],
+      "responseRequired": ["data"],
+      "itemRequired": [
+        "defaultReasoningEffort",
+        "description",
+        "displayName",
+        "hidden",
+        "id",
+        "isDefault",
+        "model",
+        "supportedReasoningEfforts"
+      ],
+      "effortRequired": ["description", "reasoningEffort"],
+      "paginationField": "nextCursor"
+    },
+    "skills/list": {
+      "params": ["cwds", "forceReload"],
+      "responseRequired": ["data"],
+      "entryRequired": ["cwd", "errors", "skills"],
+      "skillRequired": ["description", "enabled", "name", "path", "scope"]
+    },
+    "thread/start": {
+      "dynamicToolRequired": ["description", "inputSchema", "name", "type"],
+      "params": ["approvalPolicy", "cwd", "dynamicTools", "model", "sandbox"]
+    },
+    "thread/settings/update": {
+      "params": ["serviceTier", "threadId"],
+      "responseEquals": {}
+    },
+    "thread/turns/list": {
+      "params": ["cursor", "itemsView", "limit", "sortDirection", "threadId"],
+      "responseRequired": ["data"],
+      "turnRequired": ["id", "items", "itemsView", "status"],
+      "paginationField": "nextCursor"
+    },
+    "item/tool/call": {
+      "requestRequired": ["arguments", "callId", "threadId", "tool", "turnId"],
+      "responseRequired": ["contentItems", "success"]
+    },
+    "turn/input/skill": {
+      "required": ["name", "path", "type"]
+    }
+  }
+}

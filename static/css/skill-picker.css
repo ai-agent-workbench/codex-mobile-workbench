@@ -1,0 +1,22 @@
+/* Scoped rules keep checkbox controls out of the global full-width input style. */
+.skill-picker{min-width:0;margin:12px 0;font-size:.88rem}
+.skill-picker .skill-mode{margin-left:8px;font-size:.78rem;color:var(--muted)}
+.skill-picker .skill-hint{margin:5px 0 9px;color:var(--muted);font-size:.78rem;line-height:1.5}
+.skill-picker .skill-warning{margin:5px 0 9px;color:var(--danger-text,#fca5a5);font-size:.78rem;line-height:1.5}
+.skill-picker .skill-clear{min-height:44px;padding:8px 0;background:transparent;color:var(--accent);font-size:.84rem}
+.skill-picker .skill-advanced{margin:6px 0}
+.skill-picker .skill-advanced>summary{min-height:44px;padding:10px 0;font-size:.85rem;color:var(--accent);cursor:pointer}
+.skill-picker .skill-search-label{display:block!important;font-size:.78rem;color:var(--muted)}
+.skill-picker .skill-search-label .search-field{margin:5px 0 10px}
+.skill-picker .skill-groups{max-height:52vh;max-height:52dvh;overflow-y:auto;overscroll-behavior:contain;border-top:1px solid var(--line)}
+.skill-picker .skill-group{margin:0;padding:0}
+.skill-picker .skill-group h3{margin:12px 0 3px;color:var(--muted);font-size:.78rem;font-weight:600}
+.skill-picker .skill-choice{display:grid!important;grid-template-columns:22px minmax(0,1fr);align-items:start;gap:10px;width:100%;min-height:48px;margin:0;padding:11px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+.skill-picker .skill-choice input[type=checkbox]{display:block;flex:none;width:20px;height:20px;min-height:0;padding:0;margin:3px 0 0;accent-color:var(--accent)}
+.skill-picker .skill-choice span{display:block;min-width:0;overflow-wrap:anywhere}
+.skill-picker .skill-choice strong{display:block;font-size:.86rem;line-height:1.4;color:var(--text)}
+.skill-picker .skill-choice small{display:block;margin-top:3px;font-size:.75rem;line-height:1.45;color:var(--muted)}
+.skill-picker .skill-choice .skill-name{font-size:.68rem;opacity:.85}
+.skill-picker .skill-choice .skill-warning{color:var(--danger-text,#fca5a5)}
+.skill-picker :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.skill-picker [hidden]{display:none!important}

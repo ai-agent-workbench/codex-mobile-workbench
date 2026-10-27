@@ -1,0 +1,274 @@
+{% from 'search_icon.html' import search_icon %}
+{% if compact_controls_ready | default(false) %}
+{% set is_dot = conversation.get('kind') == 'dot' %}
+{{ nav_html | safe }}
+<section class="native-conversation" id="native-conversation"
+         data-conversation-id="{{ conversation.id }}"
+         data-conversation-kind="{{ 'dot' if is_dot else 'codex' }}"
+         data-back-url="{{ back_url }}"
+         data-project-name="{{ project_name }}">
+  <header class="native-conversation-head">
+    <a class="native-head-button native-back" href="{{ back_url }}" aria-label="返回">‹</a>
+    <strong class="native-conversation-title" id="conversation-title">{{ conversation.title }}</strong>
+    <span class="native-head-control native-state" id="conversation-state" title="当前状态">载入中</span>
+    {% if not is_dot %}
+    <button class="native-head-control native-tier-toggle" id="conversation-tier-toggle"
+            type="button" title="切换 Standard / Fast">Fast</button>
+    <button class="native-head-control native-context-toggle" id="conversation-context-toggle"
+            type="button" title="查看真实上下文用量">—%</button>
+    <details class="native-head-menu" data-light-dismiss="details">
+      <summary class="native-head-button" aria-label="更多操作">⋯</summary>
+      <div class="native-head-menu-panel">
+        <small class="native-head-menu-label">对话操作</small>
+        <button type="button" class="secondary" id="search-conversation"><span>{{ search_icon() }}</span>在对话中查找</button>
+        <button type="button" class="secondary" id="rename-conversation"><span>✎</span>重命名对话</button>
+        <button type="button" class="secondary" id="export-conversation"><span>⇩</span>导出对话</button>
+        <a class="secondary" href="/settings/automations?conversation_id={{ conversation.id }}"><span>◷</span>定时任务</a>
+        <hr>
+        <small class="native-head-menu-label">维护</small>
+        <button type="button" class="secondary" id="diagnose-conversation"><span>↻</span>连接与排查</button>
+        <hr>
+        <button type="button" class="danger" id="delete-conversation"><span>⌫</span>删除对话</button>
+      </div>
+    </details>
+    {% else %}
+    <details class="native-head-menu" data-light-dismiss="details">
+      <summary class="native-head-button" aria-label="更多操作">⋯</summary>
+      <div class="native-head-menu-panel">
+        <button type="button" class="secondary" id="search-conversation"><span>{{ search_icon() }}</span>在对话中查找</button>
+      </div>
+    </details>
+    {% endif %}
+  </header>
+  {% if not is_dot %}<a class="native-automation-summary" id="conversation-automation-summary" href="/settings/automations?conversation_id={{ conversation.id }}" hidden></a>{% endif %}
+  {{ upload_notice_html | safe }}
+  {% if attachment_upload_error | default('') %}<p class="message-attachments-status" role="status">{{ attachment_upload_error }}</p>{% endif %}
+  <p class="native-connection-note" id="conversation-note" role="status"
+     aria-live="polite" aria-atomic="true" hidden></p>
+  {% if not is_dot %}<section id="conversation-native-interactions" class="native-interactions" aria-live="polite" hidden></section>{% endif %}
+  <div id="conversation-history-controls" hidden>
+    <button type="button" class="secondary" id="conversation-history-older">加载更早历史</button>
+    <small id="conversation-history-status" role="status"></small>
+  </div>
+  <noscript><p>动态对话需要 JavaScript。你仍可<a href="/conversation/{{ conversation.id }}/export">下载完整对话</a>，或<a href="/conversation/{{ conversation.id }}/snapshot">读取完整历史数据</a>。</p></noscript>
+  <section class="native-messages" id="conversation-messages"></section>
+  <button class="native-new-content" id="conversation-new-content" type="button" hidden>有新内容 ↓</button>
+</section>
+
+<form class="native-composer{{ ' dot-composer' if is_dot else '' }}" id="conversation-composer">
+  <textarea name="text" rows="2" required
+            data-draft-key="codex-conversation-draft:{{ conversation.id }}"
+            placeholder="{{ '给 dot 发消息…' if is_dot else ('输入你想完成的事情…' if not conversation.thread_id else '继续这段对话…') }}"
+            aria-label="输入消息"></textarea>
+  {% if not is_dot %}<div class="message-attachments" data-message-attachments data-kind="conversation" data-id="{{ conversation.id }}" data-project-id="{{ conversation.get('project_id') or '' }}" data-owner="{{ attachment_owner | default('') }}" data-draft-key="codex-conversation-draft:{{ conversation.id }}" data-initial='{{ attachment_initial | default([]) | tojson }}'></div>{% endif %}
+  <p class="message-length" id="conversation-message-length" aria-live="polite" hidden></p>
+  <div class="native-compose-tools">
+    {% if not is_dot %}
+    {{ upload_button_html | safe }}
+    <details class="native-settings" id="conversation-settings" data-light-dismiss="details">
+      <summary id="settings-summary">模型与权限</summary>
+      <div class="native-settings-panel">
+        <div class="native-settings-head"><strong>对话设置</strong>
+          <button type="button" class="secondary" data-close-settings>完成</button></div>
+        <label>模型</label>
+        <select name="model" id="conversation-model" data-segment-source="model">
+          {% for model in models %}
+          <option value="{{ model.model }}"
+                  data-efforts='{{ model.efforts | tojson }}'
+                  data-default-effort="{{ model.default_effort }}"
+                  data-tiers='{{ model.tiers | tojson }}'
+                  {{ 'selected' if model.model == settings.get('model') else '' }}>{{ model.name }}</option>
+          {% endfor %}
+        </select>
+        <label>思考等级</label>
+        <select name="effort" id="conversation-effort" data-segment-source="effort"
+                data-current="{{ settings.get('effort') or '' }}"></select>
+        <div class="compact-control-grid native-settings-controls" aria-label="本轮其他设置">
+          <button class="compact-control" type="button" data-conversation-control="permission">权限</button>
+          <button class="compact-control" type="button" data-conversation-control="mode">默认执行</button>
+          <button class="compact-control" type="button" data-conversation-control="goal">设置目标</button>
+        </div>
+        <select name="service_tier" id="conversation-tier" data-current="{{ settings.get('service_tier') or '' }}" hidden></select>
+        <select name="collaboration_mode" id="conversation-collaboration-mode" hidden>
+          <option value="default" {{ 'selected' if settings.get('collaboration_mode', 'default') == 'default' else '' }}>默认</option>
+          <option value="plan" {{ 'selected' if settings.get('collaboration_mode', 'default') == 'plan' else '' }}>Plan</option>
+        </select>
+        <select name="permission" id="conversation-permission" hidden>
+          <option value="read-only" {{ 'selected' if settings.get('permission') == 'read-only' else '' }}>只读</option>
+          <option value="workspace-write" {{ 'selected' if settings.get('permission') == 'workspace-write' else '' }}>工作区可写</option>
+          <option value="danger-full-access" {{ 'selected' if settings.get('permission') == 'danger-full-access' else '' }}>完全访问</option>
+        </select>
+        <input type="checkbox" name="completion_notification" value="1" hidden
+          {{ 'checked' if conversation.completion_notification else '' }}>
+        {% if catalog_error %}
+        <p class="native-settings-warning">模型目录暂时不可用；当前只显示已保存的配置，稍后刷新可重试。</p>
+        {% endif %}
+        <input type="hidden" name="skills_explicit" value="1">
+        <div hidden>{% from 'skill_picker.html' import skill_picker %}{{ skill_picker(skills, settings.get('default_skills', []), 'conversation-skill-picker') }}</div>
+      </div>
+    </details>
+    <button class="native-compose-button native-notify" id="conversation-notify" type="button"
+            aria-label="答复完成后通知" aria-pressed="{{ 'true' if conversation.completion_notification else 'false' }}" title="答复完成后通知">🔔</button>
+    {% endif %}
+    <button class="native-compose-button native-refresh" id="reconcile-conversation" type="button"
+            aria-label="刷新对话内容" title="重新载入页面内容；历史和草稿保留">↻</button>
+    {% if not is_dot %}<button class="native-stop" id="stop-conversation" type="button" hidden
+            aria-label="停止本对话及子代理" title="停止本对话、子代理及原生后台命令">停止</button>{% endif %}
+    <button class="native-send" type="submit" aria-label="发送">↑</button>
+  </div>
+</form>
+{% if not is_dot %}
+{{ upload_panel_html | safe }}
+
+<dialog class="compact-option-sheet" id="conversation-option-sheet">
+  <div class="compact-option-head"><strong id="conversation-option-title"></strong><button type="button" data-close-conversation-option aria-label="取消">×</button></div>
+  <div id="conversation-option-content"></div>
+  <p class="compact-option-error" id="conversation-option-error" role="status" hidden></p>
+  <button type="button" class="compact-option-done" id="conversation-option-done">完成</button>
+</dialog>
+
+<dialog class="native-diagnostics" id="conversation-diagnostics" data-light-dismiss="dialog">
+  <div class="native-diagnostics-head">
+    <strong>连接与排查</strong>
+    <button type="button" class="secondary" data-close-diagnostics aria-label="关闭">关闭</button>
+  </div>
+  <div class="native-diagnostics-project">
+    <small>所属项目</small>
+    <strong>{{ project_name }}</strong>
+  </div>
+  <p id="conversation-diagnostics-summary">正在读取当前状态…</p>
+  <dl id="conversation-diagnostics-values"></dl>
+  <p><small>复制内容包含项目名称；不包含消息、附件、路径或网址。</small></p>
+  <div class="dialog-actions">
+    <button type="button" class="secondary" id="diagnostics-reconcile">同步状态</button>
+    <button type="button" id="copy-conversation-diagnostics">复制排查信息</button>
+  </div>
+</dialog>
+
+<dialog class="native-context-dialog" id="conversation-context" data-light-dismiss="dialog">
+  <div class="native-dialog-head">
+    <strong>上下文用量</strong>
+    <button type="button" class="secondary" data-close-context aria-label="关闭">×</button>
+  </div>
+  <div class="native-context-card">
+    <div class="native-context-percent"><b id="context-percent">—%</b><span id="context-summary">等待 App Server 的真实用量</span></div>
+    <div class="native-context-bar"><i id="context-bar"></i></div>
+    <dl class="native-context-tokens">
+      <dt>本轮输入</dt><dd id="context-input">—</dd>
+      <dt>其中缓存</dt><dd id="context-cached">—</dd>
+      <dt>本轮输出</dt><dd id="context-output">—</dd>
+    </dl>
+  </div>
+  <div class="native-context-summary-list">
+    <section class="native-context-summary-row" id="context-compaction-card">
+      <span>已记录压缩</span><b id="context-compaction-count">暂无记录</b>
+    </section>
+    <section class="native-context-summary-row" id="context-switch-card">
+      <span>内部换窗</span><b id="context-switch-count">暂无记录</b>
+    </section>
+  </div>
+  <button class="secondary native-context-action" type="button" id="compact-conversation">压缩上下文</button>
+  <p class="native-context-status" id="context-compaction-hint" aria-live="polite" hidden><small></small></p>
+  <details class="native-context-details" id="context-details">
+    <summary>详情</summary>
+    <div class="native-context-details-body">
+      <section class="native-context-detail-section">
+        <b>压缩记录</b>
+        <small id="context-compaction-breakdown">手动请求 — 次 · 其他压缩 — 次</small>
+      </section>
+      <section class="native-context-switch-details" id="context-switch-details">
+        <div><b>最近换窗记录</b><small id="context-switch-latest">自工作台开始记录后统计</small></div>
+        <ol id="context-switch-events"></ol>
+      </section>
+      <p class="native-context-scope"><small>本轮 Token 消耗与当前上下文占用不是同一指标。仅统计已收到的完成事件；旧历史或离线缺失未补计。其他压缩来源未明，可能是自动或内部触发。压缩与换窗记录可能重叠，不相加。</small></p>
+    </div>
+  </details>
+</dialog>
+
+<dialog class="native-export-dialog" id="conversation-export-dialog" data-light-dismiss="dialog">
+  <div class="native-dialog-head"><strong>导出对话</strong>
+    <button type="button" class="secondary" data-close-export aria-label="关闭">×</button></div>
+  <div class="native-export-options">
+    <button type="button" class="secondary native-export-action" id="copy-conversation-export">复制完整对话</button>
+    <button type="button" class="secondary native-export-action" id="download-conversation-export">下载 Markdown</button>
+  </div>
+</dialog>
+
+
+
+<div class="native-viewer" id="conversation-artifact-viewer" role="dialog" aria-modal="true" hidden>
+  <header class="native-viewer-head">
+    <button class="native-viewer-close" id="close-artifact-viewer" type="button" aria-label="返回对话">‹</button>
+    <strong id="artifact-viewer-title">预览</strong>
+    <a class="native-viewer-download" id="artifact-viewer-download" data-download download>保存</a>
+  </header>
+  <div class="native-viewer-stage" id="artifact-viewer-stage">
+    <img id="artifact-viewer-image" alt="" hidden>
+    <iframe id="artifact-viewer-frame" title="PDF 附件预览" hidden></iframe>
+  </div>
+  <div class="native-viewer-controls" id="artifact-viewer-controls" hidden>
+    <button type="button" id="artifact-zoom-out">－</button><output id="artifact-zoom-value">100%</output>
+    <button type="button" id="artifact-zoom-in">＋</button><button type="button" id="artifact-zoom-reset">适应</button>
+  </div>
+</div>
+
+<nav class="native-round-nav" id="conversation-round-nav" aria-label="按轮跳转" hidden>
+  <button class="native-drag-handle" type="button" aria-label="拖动翻轮按钮">⠿</button>
+  <button id="conversation-round-up" type="button" aria-label="上一轮">↑</button>
+  <button id="conversation-round-down" type="button" aria-label="下一轮">↓</button>
+</nav>
+
+<div class="native-audio-bar" id="conversation-audio-bar" hidden>
+  <button class="native-drag-handle" type="button" aria-label="拖动朗读组件">⠿</button>
+  <b id="conversation-audio-label">准备朗读</b>
+  <button id="conversation-audio-previous" type="button" aria-label="上一句">←</button>
+  <button id="conversation-audio-next" type="button" aria-label="下一句">→</button>
+  <button id="conversation-audio-settings" type="button" aria-label="朗读设置">⚙</button>
+  <button id="conversation-audio-pause" type="button" aria-label="暂停或继续">Ⅱ</button>
+  <button id="conversation-audio-stop" type="button" aria-label="停止">■</button>
+</div>
+
+<dialog class="native-audio-settings" id="conversation-audio-settings-dialog" data-light-dismiss="dialog">
+  <div class="native-dialog-head"><strong>朗读设置</strong>
+    <button type="button" class="secondary" data-close-audio-settings aria-label="关闭">×</button></div>
+  <p><small>默认不指定具体音色，由 Chrome/PWA 交给 Android 系统默认 TTS 引擎。</small></p>
+  <label>音色<select id="conversation-audio-voice"><option value="">跟随 Android 系统默认（推荐）</option></select></label>
+  <label>播放速度 <output id="conversation-audio-rate-value">0.95×</output>
+    <input id="conversation-audio-rate" type="range" min="0.70" max="1.50" step="0.05" value="0.95"></label>
+  <label>音调 <output id="conversation-audio-pitch-value">1.00</output>
+    <input id="conversation-audio-pitch" type="range" min="0.70" max="1.30" step="0.05" value="1.00"></label>
+  <div class="native-audio-settings-actions">
+    <button type="button" id="conversation-audio-test">试听当前设置</button>
+    <a class="button secondary" id="conversation-audio-more-settings" href="/settings/tts">更多 TTS 设置与诊断</a>
+  </div>
+</dialog>
+
+<aside class="native-cross-toast" id="conversation-cross-toast" hidden>
+  <span aria-hidden="true">✓</span><b id="conversation-cross-title">其他对话已经完成</b>
+  <a id="conversation-cross-open" href="#">打开</a>
+</aside>
+
+{% endif %}
+{% include 'conversation_search.html' %}
+<div class="native-toast" id="conversation-toast" role="status" aria-live="polite" hidden></div>
+<script id="conversation-initial-snapshot" type="application/json">{{ initial_snapshot | tojson }}</script>
+<script src="{{ static_url('/static/reconnect-coordinator.js') }}" defer></script>
+{% if is_dot %}
+<script src="{{ static_url('/static/dot-conversation.js') }}" defer></script>
+<script src="{{ static_url('/static/conversation-enhancements.js') }}" data-conversation-module="markdown" defer></script>
+{% else %}
+<script src="{{ static_url('/static/conversation-interactions.js') }}" defer></script>
+<script src="{{ static_url('/static/message-attachments.js') }}" defer></script>
+<script src="{{ static_url('/static/conversation.js') }}" defer></script>
+<script src="{{ static_url('/static/conversation-enhancements.js') }}"
+        data-conversation-module="markdown" defer></script>
+<script src="{{ static_url('/static/conversation-round-navigation.js') }}" defer></script>
+<script src="{{ static_url('/static/tts.js') }}" defer></script>
+<script src="{{ static_url('/static/conversation-tts.js') }}" defer></script>
+
+<script src="{{ static_url('/static/automation-conversation.js') }}" defer></script>
+{% endif %}
+
+{% else %}
+{% include 'conversation_legacy.html' %}
+{% endif %}

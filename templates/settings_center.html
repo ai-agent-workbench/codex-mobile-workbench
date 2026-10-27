@@ -1,0 +1,82 @@
+{{ nav_html | safe }}
+{% from 'search_icon.html' import search_icon %}
+<link rel="stylesheet" href="{{ static_url('/static/css/settings-center.css') }}">
+<div class="settings-page settings-center" id="settings-center">
+  <header class="sc-head"><button type="button" id="sc-back" aria-label="返回设置" hidden>‹</button><h1 id="sc-title" tabindex="-1">设置与安全</h1><button type="button" id="sc-help" aria-label="查看说明">?</button><button type="button" id="sc-save" hidden disabled>保存</button></header>
+  <p id="sc-status" role="status" class="sc-status">正在读取设置…</p><button type="button" id="sc-reload" class="sc-text" hidden>重新读取（保留前先确认）</button>
+  <label class="sc-row sc-scope" id="sc-scope-row" hidden><span>生效范围</span><select id="sc-scope" aria-label="设置生效范围"><option value="">工作台默认</option></select></label>
+  <section data-screen="home">
+    <a class="sc-row" href="/settings/automations"><span>定时任务</span><span aria-hidden="true">›</span></a>
+    <label class="sc-search search-field"><input type="search" id="sc-search" placeholder="搜索设置" aria-label="搜索设置">{{ search_icon() }}</label>
+    <p id="sc-empty" class="sc-note" hidden>没有找到相关设置</p>
+    {% for heading, rows in [
+      ('工作方式', [('models','模型与执行','默认、预设','模型 思考 权限 速度 项目 继承 预设'),('rules','偏好与规则','个人 / 项目','指令 AGENTS 语言 回答长短 项目说明'),('tools','技能与连接','Skills','技能 默认 目录 MCP 插件')]),
+      ('使用偏好', [('appearance','外观与输入','这台设备','主题 深色 浅色 字号 代码 换行 Enter 发送'),('notifications','通知与声音','提醒、朗读','完成 推送 提示音 TTS')]),
+      ('管理', [('data','数据与备份','文件、导出','上传 附件 交付物 对话 备份 恢复'),('security','安全与维护','版本、诊断','登录 会话 Passkey 连接 磁盘 更新')])
+    ] %}
+    <div class="sc-home-group"><h2>{{ heading }}</h2><div class="sc-list">
+    {% for key, label, value, keywords in rows %}<button type="button" class="sc-row sc-home-row" data-go="{{ key }}" data-keywords="{{ keywords }}"><span class="sc-label">{{ label }}</span><span class="sc-value" id="sc-summary-{{ key }}">{{ value }}</span><span class="sc-chevron">›</span></button>{% endfor %}
+    </div></div>{% endfor %}
+    <section class='codex-quota-card' id='codex-quota-card' data-endpoint='/settings/codex-quota' aria-labelledby='codex-quota-title'>
+      <div class='codex-quota-top'><div class='codex-quota-title'><b id='codex-quota-title'>Codex 周额度</b><small id='codex-quota-plan'>订阅额度</small></div><strong id='codex-weekly-value'>—</strong></div>
+      <span class='codex-weekly-bar' id='codex-weekly-bar' role='progressbar' aria-label='周额度' aria-valuemin='0' aria-valuemax='100' aria-valuenow='0'><i id='codex-weekly-fill'></i></span>
+      <div class='codex-quota-bottom'><small class='codex-quota-status' id='codex-quota-status' role='status'>正在读取最新额度…</small><button class='codex-quota-refresh' id='codex-quota-refresh' type='button' aria-label='刷新额度' title='刷新额度'><span aria-hidden='true'>↻</span></button></div>
+    </section>
+  </section>
+  <section data-screen="models" hidden>
+    <p class="sc-note">仅新对话生效 · 本次选择优先</p>
+    <div class="sc-list"><label class="sc-row"><span>使用预设</span><select id="sc-presets" aria-label="使用预设"><option value="">自定义</option></select></label></div>
+    <h2>默认配置</h2><div class="sc-list">
+      {% for key, label in [('model','模型'),('effort','思考等级'),('service_tier','服务速度'),('collaboration_mode','执行模式'),('permission','执行权限'),('followup','执行中追加')] %}
+      <label class="sc-row"><span class="sc-label">{{ label }}<small data-source="{{ key }}"></small></span><select data-setting="{{ key }}" aria-label="{{ label }}"></select></label>{% endfor %}
+    </div><div class="sc-actions"><button type="button" class="sc-text" id="sc-preset-create">存为预设</button><button type="button" class="sc-text" id="sc-default-reset">恢复继承</button></div>
+    <button type="button" class="sc-text" id="sc-preset-delete" hidden>删除所选预设</button>
+  </section>
+  <section data-screen="rules" hidden>
+    <div class="sc-tabs"><button type="button" data-rule-tab="personal" aria-pressed="true">个人偏好</button><button type="button" data-rule-tab="project" aria-pressed="false">项目规则</button></div>
+    <div id="sc-rule-project-row" class="sc-list" hidden><label class="sc-row"><span>项目</span><select id="sc-rule-project" aria-label="规则所属项目"></select></label><label class="sc-row"><span>文档</span><select id="sc-rule-name" aria-label="规则文档"><option>AGENTS.md</option><option>项目说明.md</option></select></label></div>
+    <p id="sc-rule-scope" class="sc-note">仅此工作台 · 新对话首轮提供个人偏好，不改共享配置</p>
+    <textarea id="sc-rule-content" aria-label="规则内容" maxlength="4000" placeholder="例如：默认用简体中文；先给结论；需要时再展开细节。"></textarea>
+    <p id="sc-rule-meta" class="sc-note"></p>
+    <div class="sc-actions"><button type="button" class="sc-text" id="sc-rule-previous">恢复上一版</button><button type="button" class="sc-text" id="sc-rule-preview">预览差异</button></div>
+    <details class="sc-details"><summary>规则来源与生效范围</summary><p>个人偏好保存于当前账号的工作台设置，不替代系统、开发者或项目规则。项目 AGENTS.md 是真实文件，可能也被桌面与 CLI 使用；还可能受到上级或更深目录规则约束，此处只编辑项目根文件。已开始的对话不保证刷新规则，请新建对话。</p></details>
+  </section>
+  <section data-screen="tools" hidden>
+    <p class="sc-note" id="sc-skills-source">新对话的技能使用方式</p>
+    {% from 'skill_picker.html' import skill_picker %}
+    {{ skill_picker([], [], 'sc-skill-picker', true) }}
+    <button type="button" class="sc-text" id="sc-skills-inherit">恢复技能继承</button>
+    <h2>连接与完整技能管理</h2><p class="sc-note">本批提供真实技能目录与默认选择。安装、更新、停用及 MCP / 插件连接管理尚未接入，没有执行任何连接或授权操作。</p>
+  </section>
+  <section data-screen="appearance" hidden>
+    <p id="sc-appearance-loading" class="sc-note" role="status">本机显示与输入设置尚未就绪，加载后即可操作；其他设置可正常使用。</p>
+    <p class="sc-note">只保存在这台设备的当前浏览器</p><div class="sc-list">
+      <label class="sc-row"><span>主题</span><select id="theme-select" aria-label="选择界面主题" disabled><option value='dark'>深色</option><option value='light'>浅色</option><option value="system">跟随系统</option></select></label>
+      <label class="sc-row"><span>回复字号</span><select id="sc-font" aria-label="回复字号" disabled><option value="1">标准</option><option value="1.1">较大 · 110%</option><option value="1.2">大 · 120%</option></select></label>
+      <label class="sc-row"><span>代码自动换行</span><input type="checkbox" id="sc-wrap" aria-label="代码自动换行" disabled></label>
+      <label class="sc-row"><span>发送方式</span><select id="sc-send" aria-label="发送方式" disabled><option value="button">点按钮发送</option><option value="enter">Enter 发送</option></select></label>
+    </div><div class="sc-reading-sample">这是回复文字的显示效果。<pre><code>const preference = { scope: "this browser", preview: true };</code></pre></div>
+    <button type="button" class="sc-text" id="sc-input-test" disabled>试一下输入</button><button type="button" class="sc-text" id="sc-appearance-reset" disabled>恢复本机显示与输入默认值</button>
+  </section>
+  <section data-screen="notifications" hidden>
+    <h2>完成提醒</h2><div class="sc-list"><a class="sc-row" href="/notifications"><span>本机系统通知</span><span class="sc-value">管理推送</span><span>›</span></a><label class="sc-row"><span>新对话默认提醒<small data-source="completion_notification"></small></span><select data-setting="completion_notification" aria-label="新对话默认提醒"></select></label></div>
+    <h2>声音 · 这台设备</h2><div class="sc-list"><a class="sc-row" href="/settings/completion-sound"><span>前台完成提示音</span><span>›</span></a><a class="sc-row" href="/settings/tts"><span>回复朗读（TTS）</span><span>›</span></a></div>
+    <details class="sc-details"><summary>收不到提醒？</summary><p>新默认不改变旧对话的铃铛，也不追发历史。后台系统通知需要在本机主动开启推送并允许浏览器通知；前台提示音与系统通知是不同机制。本页不会发送测试通知。</p></details>
+  </section>
+  <section data-screen="data" hidden>
+    <h2>文件与对话</h2><div class="sc-list"><a class="sc-row" href="/inbox"><span>临时对话上传文件</span><span>›</span></a><a class="sc-row" href="/files?path={{ projects_path | urlencode }}"><span>项目文件与手机上传资料</span><span>›</span></a><a class="sc-row" href="/projects/history"><span>交付物与对话导出</span><span>›</span></a></div>
+    <h2>备份与恢复</h2><p class="sc-note">尚未开放整站备份、批量清理或恢复向导。导出一份对话不等于备份原生执行状态、项目文件和全部附件。</p>
+  </section>
+  <section data-screen="security" hidden>
+    <h2>账号</h2><div class="sc-list"><div class="sc-row"><span>登录状态</span><span class="sc-value" id="sc-login-state">未检查</span></div><div class="sc-row"><span>Passkey</span><span class="sc-value" id="sc-passkey-state">未检查</span></div></div>
+    <h2>状态与诊断</h2>
+    <p><a class="button secondary" href="/settings/diagnostics/report">报告刚才的故障</a></p>
+    <p class="muted">打不开或页面崩溃后，可在这里提交故障时间和可选截图；仅保存在本机。</p><div class="sc-list" id="sc-diagnostics"><div class="sc-row"><span>工作台与 App Server</span><span class="sc-value">尚未检查</span></div></div>
+    <div class="sc-actions"><button type="button" class="sc-text" id="sc-diagnostic-run">只读检查</button><button type="button" class="sc-text" id="sc-diagnostic-copy" disabled>复制脱敏摘要</button></div>
+    <details class='settings-advanced sc-details'><summary>检查范围与后续维护</summary><p>检查当前 HTTP、原生协议与模型目录、磁盘余量，显示已加载设置模块的构建指纹。不调用模型，不外发通知，也不验证手机公网或 Windows 通道。会话撤销、认证管理、升级和回退尚未提供自助操作。</p></details>
+    <form class='settings-logout' action='/logout' method='post'><button class='secondary'>退出登录</button></form>
+  </section>
+</div>
+<dialog id="sc-dialog" class="sc-dialog" aria-labelledby="sc-dialog-title"><h2 id="sc-dialog-title"></h2><div id="sc-dialog-content"></div><div class="sc-actions"><button type="button" class="secondary" id="sc-dialog-cancel">取消</button><button type="button" id="sc-dialog-confirm">确认</button></div></dialog>
+<script src="{{ static_url('/static/settings-center.js') }}" defer></script>
+<script src="{{ static_url('/static/settings-codex-quota.js') }}" defer></script>

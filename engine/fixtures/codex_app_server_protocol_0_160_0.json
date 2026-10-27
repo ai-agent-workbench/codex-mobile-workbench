@@ -1,0 +1,256 @@
+{
+  "fixtureVersion": 1,
+  "cliVersion": "codex-cli 0.160.0",
+  "serverVersion": "0.160.0",
+  "sourcePackage": "OpenAI npm @openai/codex 0.160.0-linux-x64",
+  "codexSha256": "12eb3e81114588aca3b7998f4f19e8997b056aca08e57a7ca7c8a3ec8c652aad",
+  "codeModeHostSha256": "37cab1584302611e9936902219640ab5e7a79fcfccd2504c6e85ea8cb97d0e10",
+  "schemaCommand": "codex app-server generate-json-schema [--experimental] --out DIR",
+  "schemaSha256": "8683f6fd9fbb994fa2bfb704ab5b02c9890238fa507a4c0ff33ff45884cd0a2e",
+  "experimentalSchemaSha256": "7243ba241962af92ca60581f1a81808ebda4212a800f8b205f54703bcfd508c5",
+  "initialize": {
+    "requestRequired": [
+      "clientInfo"
+    ],
+    "responseRequired": [
+      "codexHome",
+      "platformFamily",
+      "platformOs",
+      "userAgent"
+    ]
+  },
+  "methods": {
+    "model/list": {
+      "params": [
+        "cursor",
+        "includeHidden",
+        "limit"
+      ],
+      "responseRequired": [
+        "data"
+      ],
+      "itemRequired": [
+        "defaultReasoningEffort",
+        "description",
+        "displayName",
+        "hidden",
+        "id",
+        "isDefault",
+        "model",
+        "supportedReasoningEfforts"
+      ],
+      "effortRequired": [
+        "description",
+        "reasoningEffort"
+      ],
+      "paginationField": "nextCursor"
+    },
+    "skills/list": {
+      "params": [
+        "cwds",
+        "forceReload"
+      ],
+      "responseRequired": [
+        "data"
+      ],
+      "entryRequired": [
+        "cwd",
+        "errors",
+        "skills"
+      ],
+      "skillRequired": [
+        "description",
+        "enabled",
+        "name",
+        "path",
+        "scope"
+      ]
+    },
+    "thread/start": {
+      "dynamicToolRequired": [
+        "description",
+        "inputSchema",
+        "name",
+        "type"
+      ],
+      "params": [
+        "approvalPolicy",
+        "cwd",
+        "dynamicTools",
+        "model",
+        "sandbox",
+        "config"
+      ]
+    },
+    "thread/settings/update": {
+      "params": [
+        "serviceTier",
+        "threadId"
+      ],
+      "responseEquals": {}
+    },
+    "thread/name/set": {
+      "params": [
+        "name",
+        "threadId"
+      ],
+      "responseEquals": {}
+    },
+    "thread/turns/list": {
+      "params": [
+        "cursor",
+        "itemsView",
+        "limit",
+        "sortDirection",
+        "threadId"
+      ],
+      "responseRequired": [
+        "data"
+      ],
+      "turnRequired": [
+        "id",
+        "items",
+        "itemsView",
+        "status"
+      ],
+      "paginationField": "nextCursor"
+    },
+    "item/tool/call": {
+      "requestRequired": [
+        "arguments",
+        "callId",
+        "threadId",
+        "tool",
+        "turnId"
+      ],
+      "responseRequired": [
+        "contentItems",
+        "success"
+      ]
+    },
+    "turn/input/skill": {
+      "required": [
+        "name",
+        "path",
+        "type"
+      ]
+    },
+    "thread/resume": {
+      "params": [
+        "config",
+        "excludeTurns",
+        "threadId"
+      ]
+    },
+    "config/read": {
+      "params": [
+        "cwd",
+        "includeLayers"
+      ],
+      "responseRequired": [
+        "config",
+        "origins"
+      ]
+    },
+    "review/start": {
+      "params": [
+        "delivery",
+        "target",
+        "threadId"
+      ],
+      "responseRequired": [
+        "reviewThreadId",
+        "turn"
+      ],
+      "targetTypes": [
+        "uncommittedChanges",
+        "baseBranch",
+        "commit",
+        "custom"
+      ]
+    },
+    "thread/items/list": {
+      "params": [
+        "cursor",
+        "limit",
+        "sortDirection",
+        "threadId",
+        "turnId"
+      ],
+      "responseRequired": [
+        "data"
+      ],
+      "entryRequired": [
+        "item",
+        "turnId"
+      ],
+      "paginationField": "nextCursor"
+    },
+    "thread/list": {
+      "params": [
+        "ancestorThreadId",
+        "archived",
+        "cursor",
+        "cwd",
+        "limit",
+        "modelProviders",
+        "originators",
+        "parentThreadId",
+        "projectId",
+        "searchTerm",
+        "sectionId",
+        "sortDirection",
+        "sortKey",
+        "sourceKinds",
+        "useStateDbOnly"
+      ],
+      "responseRequired": [
+        "data"
+      ],
+      "entryRequired": [
+        "id",
+        "parentThreadId"
+      ],
+      "paginationField": "nextCursor"
+    },
+    "thread/backgroundTerminals/list": {
+      "params": [
+        "cursor",
+        "limit",
+        "threadId"
+      ],
+      "responseRequired": [
+        "data"
+      ],
+      "entryRequired": [
+        "command",
+        "cwd",
+        "itemId",
+        "processId"
+      ],
+      "paginationField": "nextCursor"
+    },
+    "thread/backgroundTerminals/clean": {
+      "params": [
+        "threadId"
+      ],
+      "responseEquals": {}
+    },
+    "thread/loaded/list": {
+      "params": [
+        "cursor",
+        "limit"
+      ],
+      "responseRequired": [
+        "data"
+      ],
+      "paginationField": "nextCursor",
+      "entryType": "thread_id"
+    }
+  },
+  "sourceOrigin": "OpenAI official npm package via existing Clash proxy, npm signature and dist SHA-512 verified",
+  "requestUserInputDefaultModeConfig": true,
+  "metadataResume": true,
+  "itemPagination": true,
+  "conversationTreeStop": true
+}

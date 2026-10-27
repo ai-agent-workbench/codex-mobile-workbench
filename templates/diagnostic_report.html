@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow"><title>提交故障报告</title>
+  <style>
+    :root{color-scheme:light dark;font-family:system-ui,-apple-system,"Segoe UI",sans-serif} body{margin:0;background:#f5f6f8;color:#1d2530}.wrap{max-width:620px;margin:auto;padding:20px 16px 40px}.back{color:#1265d6;text-decoration:none}.card{margin-top:16px;padding:18px;background:#fff;border-radius:14px;box-shadow:0 1px 5px #0001}h1{font-size:1.35rem;margin:14px 0 8px}p,small{line-height:1.55}label{font-weight:650;display:block;margin:18px 0 7px}input,select,button{font:inherit;box-sizing:border-box}input,select{width:100%;padding:11px;border:1px solid #aab2bd;border-radius:9px;background:transparent}button{margin-top:21px;width:100%;padding:12px;border:0;border-radius:9px;background:#1265d6;color:white;font-weight:700}.note{font-size:.9rem;background:#fff6dc;padding:10px;border-radius:8px}.status{padding:12px;border-radius:9px;background:#e7f5ea}.error{padding:12px;border-radius:9px;background:#ffe9e8;color:#8a2020}.muted{color:#58616e;font-size:.9rem}@media(prefers-color-scheme:dark){body{background:#15191f;color:#e7eaf0}.card{background:#202630}.note{background:#493b18}.status{background:#173c28}.error{background:#4d2424}input,select{border-color:#737d8c}}
+  </style>
+</head>
+<body><main class="wrap">
+  <a class="back" href="/settings">← 返回设置</a>
+  <section class="card">
+    <h1>提交故障报告</h1>
+    <p>仅在您主动提交时保存这份报告到本机。它不会自动截屏、不会读取对话内容，也不会自动重发。</p>
+    {% if result %}<p class="status" role="status">已保存。报告编号：<code>{{ result.report_id }}</code>{% if not result.diagnostics_logged %}<br>诊断日志关联未确认，但报告文件已保存。{% endif %}</p>{% endif %}
+    {% if error %}<p class="error" role="alert">{{ error.message }}</p>{% endif %}
+    <form id="fault-report" action="/settings/diagnostics/report" method="post" enctype="multipart/form-data">
+      <input id="report-id" type="hidden" name="report_id" value="{{ report_id }}">
+      <input id="client-page-id" type="hidden" name="client_page_id"><input id="source-path" type="hidden" name="source_path"><input id="last-phase" type="hidden" name="last_phase"><input id="client-time" type="hidden" name="client_time"><input id="client-version" type="hidden" name="client_version">
+      <label for="category">故障类别</label><select id="category" name="category" required><option value="open_failed">页面无法打开</option><option value="page_crashed">页面疑似崩溃</option><option value="other">其他问题</option></select>
+      <label for="fault-time">大致发生时间</label><input id="fault-time" name="fault_time" type="datetime-local" value="{{ fault_time }}" data-server-utc="{{ fault_time }}Z" required>
+      <label for="screenshot">可选截图（PNG 或 JPEG，不超过 3 MiB）</label><input id="screenshot" name="screenshot" type="file" accept="image/png,image/jpeg">
+      <p class="note"><b>隐私提醒：</b>截图由您手动选择，可能含有私人内容。只选择必要区域；该报告只保存在本机。</p>
+      <button id="submit-button" type="submit">保存故障报告</button><p id="submit-status" class="muted" aria-live="polite"></p>
+    </form>
+    <noscript><p class="muted">此表单无需 JavaScript 也可提交；预填时间按 UTC 处理。</p></noscript>
+  </section>
+</main><script src="{{ static_url('/static/diagnostic-report.js') }}" defer></script></body></html>

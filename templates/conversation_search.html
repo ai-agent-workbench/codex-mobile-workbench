@@ -1,0 +1,9 @@
+{% from 'search_icon.html' import search_icon %}
+<dialog class="native-search-dialog" id="conversation-search-dialog" data-light-dismiss="dialog">
+  <div class="native-dialog-head"><strong>在对话中查找</strong>
+    <button type="button" class="secondary" data-close-search aria-label="关闭">×</button></div>
+  <label class="search-field"><input id="conversation-search-input" type="search" placeholder="输入关键词" aria-label="在对话中查找" autocomplete="off">{{ search_icon() }}</label>
+  <div class="native-search-actions"><span id="conversation-search-status">输入关键词开始查找</span>
+    <button type="button" class="secondary" id="conversation-search-prev">上一个</button>
+    <button type="button" class="secondary" id="conversation-search-next">下一个</button></div>
+</dialog>

@@ -1,0 +1,140 @@
+{
+  "fixtureVersion": 1,
+  "cliVersion": "codex-cli 0.153.1",
+  "serverVersion": "0.153.1",
+  "sourcePackage": "Codex Desktop bundled WSL runtime 0.153.1",
+  "codexSha256": "b9315df68cb0e2827c940ffacb66f7524e820d9744060c755fbf938724ad2b76",
+  "codeModeHostSha256": "c215117917037afd6b7621ba11ca18054ebdb890c314454f485b27574a73e1b7",
+  "schemaCommand": "codex app-server generate-json-schema [--experimental] --out DIR",
+  "schemaSha256": "e8284c5cb8157554a3dd1e035aadbd4325aea501af56887e9c2e12eb1b9b9448",
+  "experimentalSchemaSha256": "b06f77062369d481a59cc70720c12b89cb9dd49c385863923262102d3ad6c978",
+  "initialize": {
+    "requestRequired": [
+      "clientInfo"
+    ],
+    "responseRequired": [
+      "codexHome",
+      "platformFamily",
+      "platformOs",
+      "userAgent"
+    ]
+  },
+  "methods": {
+    "model/list": {
+      "params": [
+        "cursor",
+        "includeHidden",
+        "limit"
+      ],
+      "responseRequired": [
+        "data"
+      ],
+      "itemRequired": [
+        "defaultReasoningEffort",
+        "description",
+        "displayName",
+        "hidden",
+        "id",
+        "isDefault",
+        "model",
+        "supportedReasoningEfforts"
+      ],
+      "effortRequired": [
+        "description",
+        "reasoningEffort"
+      ],
+      "paginationField": "nextCursor"
+    },
+    "skills/list": {
+      "params": [
+        "cwds",
+        "forceReload"
+      ],
+      "responseRequired": [
+        "data"
+      ],
+      "entryRequired": [
+        "cwd",
+        "errors",
+        "skills"
+      ],
+      "skillRequired": [
+        "description",
+        "enabled",
+        "name",
+        "path",
+        "scope"
+      ]
+    },
+    "thread/start": {
+      "dynamicToolRequired": [
+        "description",
+        "inputSchema",
+        "name",
+        "type"
+      ],
+      "params": [
+        "approvalPolicy",
+        "cwd",
+        "dynamicTools",
+        "model",
+        "sandbox",
+        "config"
+      ]
+    },
+    "thread/settings/update": {
+      "params": [
+        "serviceTier",
+        "threadId"
+      ],
+      "responseEquals": {}
+    },
+    "thread/turns/list": {
+      "params": [
+        "cursor",
+        "itemsView",
+        "limit",
+        "sortDirection",
+        "threadId"
+      ],
+      "responseRequired": [
+        "data"
+      ],
+      "turnRequired": [
+        "id",
+        "items",
+        "itemsView",
+        "status"
+      ],
+      "paginationField": "nextCursor"
+    },
+    "item/tool/call": {
+      "requestRequired": [
+        "arguments",
+        "callId",
+        "threadId",
+        "tool",
+        "turnId"
+      ],
+      "responseRequired": [
+        "contentItems",
+        "success"
+      ]
+    },
+    "turn/input/skill": {
+      "required": [
+        "name",
+        "path",
+        "type"
+      ]
+    },
+    "thread/resume": {
+      "params": [
+        "config",
+        "threadId"
+      ]
+    }
+  },
+  "sourceOrigin": "Locally installed Codex Desktop WSL runtime; paired binaries copied and SHA-256 verified",
+  "requestUserInputDefaultModeConfig": true
+}

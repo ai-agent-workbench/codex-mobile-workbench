@@ -1,0 +1,63 @@
+# Python environments, bytecode, and tool caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.credentials
+credentials/
+secrets/
+
+# Runtime state, databases, logs, and task data
+state/
+runtime/
+data/
+tasks/
+task-data/
+sessions/
+*.db
+*.sqlite
+*.sqlite3
+*.jsonl
+*.log
+logs/
+
+# User-provided files and generated working data
+uploads/
+upload/
+attachments/
+downloads/
+edits/
+tmp/
+temp/
+*.tmp
+*.swp
+*~
+
+# Private keys commonly stored without an extension
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# OS and editor metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

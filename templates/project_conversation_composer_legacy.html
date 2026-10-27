@@ -1,0 +1,78 @@
+<section class="chat-composer project-start-composer" id="new-conversation">
+  <h2>新建项目对话</h2>
+  {% set initial = namespace(model=models[0] if models else none) %}
+  {% for candidate in models %}
+    {% if candidate.model == settings.model %}{% set initial.model = candidate %}{% endif %}
+  {% endfor %}
+  {% set initial_effort = settings.effort or (initial.model.default_effort if initial.model else 'medium') %}
+  <form id="project-send" action="/conversation/new" method="post">
+    <input type="hidden" name="project_id" value="{{ project_id }}">
+    <input type="hidden" name="client_command_id" value="">
+    <textarea name="prompt" rows="5" required
+              data-draft-key="codex-project-conversation-draft:{{ project_id }}"
+              placeholder="这段对话准备处理什么？"></textarea>
+    <div class="message-attachments" data-message-attachments data-kind="project" data-id="{{ project_id }}" data-owner="{{ attachment_owner | default('') }}" data-draft-key="codex-project-conversation-draft:{{ project_id }}" data-initial='{{ attachment_initial | default([]) | tojson }}'></div>
+    <p class="message-length" id="project-message-length" aria-live="polite" hidden></p>
+    <div class="project-start-settings" aria-label="本次对话配置">
+      <label>模型
+        <select name="model" id="project-conversation-model" data-segment-source="model">
+          {% for model in models %}
+          <option value="{{ model.model }}"
+                  data-efforts='{{ model.efforts | tojson }}'
+                  data-default-effort="{{ model.default_effort }}"
+                  data-tiers='{{ model.tiers | tojson }}'
+                  {{ 'selected' if model.model == settings.model else '' }}>{{ model.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>思考等级
+        <select name="effort" id="project-conversation-effort" data-segment-source="effort"
+                data-current="{{ settings.effort }}">
+          {% if initial.model and initial_effort not in initial.model.efforts %}<option value="{{ initial_effort }}" selected>{{ initial_effort }}（不可用）</option>{% endif %}
+          {% for effort in initial.model.efforts if initial.model %}
+          <option value="{{ effort }}" {{ 'selected' if effort == initial_effort else '' }}>{{ effort }}</option>
+          {% else %}
+          <option value="{{ initial_effort }}" selected>{{ initial_effort }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>服务速度
+        <select name="service_tier" id="project-conversation-tier"
+                data-current="{{ settings.service_tier or '' }}">
+          <option value="" {{ 'selected' if not settings.service_tier else '' }}>标准</option>
+          {% for service_tier in initial.model.tiers if initial.model %}
+          <option value="{{ service_tier.id }}"
+                  {{ 'selected' if service_tier.id == settings.service_tier else '' }}>{{ service_tier.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>执行模式
+        <select name="collaboration_mode" id="project-conversation-collaboration-mode">
+          <option value="default" {{ 'selected' if settings.get('collaboration_mode', 'default') == 'default' else '' }}>默认</option>
+          <option value="plan" {{ 'selected' if settings.get('collaboration_mode', 'default') == 'plan' else '' }}>Plan</option>
+        </select>
+      </label>
+      <label>执行权限
+        <select name="permission" id="project-conversation-permission">
+          <option value="read-only" {{ 'selected' if settings.permission == 'read-only' else '' }}>只读</option>
+          <option value="workspace-write" {{ 'selected' if settings.permission == 'workspace-write' else '' }}>工作区可写</option>
+          <option value="danger-full-access" {{ 'selected' if settings.permission == 'danger-full-access' else '' }}>完全访问</option>
+        </select>
+      </label>
+    </div>
+    {% if catalog_error %}
+    <p class="project-settings-warning">模型目录暂时不可用；当前使用默认配置，稍后刷新可重试。</p>
+    {% endif %}
+    <input type="hidden" name="completion_notification" value="{{ '1' if settings.get('completion_notification', true) else '0' }}">
+    <input type="hidden" name="skills_explicit" value="1">
+    {% from 'skill_picker.html' import skill_picker %}
+    {{ skill_picker(skills, settings.get('skills', []), 'project-skill-picker') }}
+    <div class="composer-actions">
+      {{ upload_button_html | safe }}
+      <button class="send-button">开始</button>
+    </div>
+  </form>
+  {{ upload_panel_html | safe }}
+</section>
+<script src="{{ static_url('/static/message-attachments.js') }}" defer></script>
+<script src="{{ static_url('/static/project-conversation.js') }}" defer></script>

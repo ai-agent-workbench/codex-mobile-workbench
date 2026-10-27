@@ -1,0 +1,41 @@
+{
+  "generated_version": "0.159.2",
+  "generated_at": "2026-10-02",
+  "source": "local App Server schema dump",
+  "source_schema_sha256": "7243ba241962af92ca60581f1a81808ebda4212a800f8b205f54703bcfd508c5",
+  "files": [
+    {
+      "path": "CommandExecutionRequestApprovalParams.json",
+      "sha256": "c9728280b8f3204fd729d0fb3d1ca7bb05b1150de26b3653f7163e6a9bd941e7"
+    },
+    {
+      "path": "CommandExecutionRequestApprovalResponse.json",
+      "sha256": "6d0767113e22f311381809b6b236b0dde2b99b01992879c26bf7b1ea0e003cb7"
+    },
+    {
+      "path": "FileChangeRequestApprovalParams.json",
+      "sha256": "13848b26814c286ad6425a20d01c1691c86790e1f9e2529399677a8a22fe0d18"
+    },
+    {
+      "path": "FileChangeRequestApprovalResponse.json",
+      "sha256": "b95b03ee6be674e25cee2e863cc135a28620e1070addd2f34685aadee27cde08"
+    },
+    {
+      "path": "McpServerElicitationRequestParams.json",
+      "sha256": "225e9e9198019a71e1680172484b0863817d550f7089834b848f011904670f47"
+    },
+    {
+      "path": "McpServerElicitationRequestResponse.json",
+      "sha256": "792a012fdfe53ac211575a6c37ffbd492be848d15cb313d1bb4b534ade1f54ac"
+    },
+    {
+      "path": "PermissionsRequestApprovalParams.json",
+      "sha256": "c11fbe632472ab0923aba5c0a53da3d6d86929bcd5c78e7c13c51c6b2db508ff"
+    },
+    {
+      "path": "PermissionsRequestApprovalResponse.json",
+      "sha256": "23f3f24e9dbf35db3e0b85703f0d934da5a1cff3cbb611fba8bcd41f3b4a04b0"
+    }
+  ],
+  "fixture_concat_sha256": "c3c697f703ae03279eaf9f980688e0d1dc6e4cf9dbb4fce75ff0f9bd22da5e55"
+}

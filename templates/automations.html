@@ -1,0 +1,30 @@
+{{ nav_html | safe }}
+<link rel="stylesheet" href="{{ static_url('/static/css/automations.css') }}">
+<section class="automation-page" id="automation-page">
+  <header class="automation-head"><a href="/settings" aria-label="返回设置">‹</a><h1>定时任务</h1><button type="button" id="auto-refresh" class="secondary">刷新</button></header>
+  <p id="auto-status" role="status">正在读取…</p>
+  <div class="automation-actions"><button type="button" id="auto-create">新建任务</button><a id="auto-all" href="/settings/automations" hidden>查看全部任务</a></div>
+  <p id="auto-empty" hidden>还没有定时任务。先在一个对话中发送首条消息，再为它添加任务。</p>
+  <div id="auto-list"></div>
+  <details class="automation-help"><summary>执行与权限说明</summary><p>关闭页面仍会执行；每次模型回复保留在原对话。</p><p>支持每隔若干分钟、每天、每周或指定时间执行一次。默认时区为 Asia/Hong_Kong。每次均使用原对话的模型、思考、技能与执行模式设置，权限和工作目录固定在创建时的范围。</p><p>对话忙碌时等下一轮；同一任务前轮未结束时跳过新的时段，避免堆积。维护错过超过一分钟的执行时段会记为跳过，不补跑过去的巡检。未知投递不自动重发。连续未执行时段会合并显示次数，不删除实际模型回复。</p><p>暂停、删除或修改任务会阻止尚未开始的旧轮次，不中断已经开始的轮次。删除任务不删除聊天记录；删除整个对话会一并删除其任务和运行记录。权限、执行模式或目录改变后请重新创建任务。</p><p>在对话中明确要求创建或恢复任务即可按原对话权限启用，无需在此页再次确认；也可直接在对话中修改、暂停或删除。无人值守可能消耗模型额度，并按已确认权限执行工具；请把授权范围和需要输出的结果写清楚。旧对话未注册新的 AI 管理工具，仍可在本页添加和管理。</p></details>
+</section>
+<dialog id="auto-dialog" class="automation-dialog" aria-labelledby="auto-dialog-title">
+  <form id="auto-form">
+    <header class="automation-head"><h2 id="auto-dialog-title">新建任务</h2><button type="button" id="auto-cancel" class="secondary">关闭</button></header>
+    <label>结果所在对话<select id="auto-conversation" required></select></label>
+    <label>任务名称<input id="auto-title" maxlength="120" required></label>
+    <label>每轮执行内容<textarea id="auto-prompt" rows="5" maxlength="60000" required placeholder="例如：只读检查 Windows 剩余物理内存，输出总量、可用量、使用率，与上次比较；不要修改系统。"></textarea></label>
+    <label>执行规则<select id="auto-kind"><option value="interval">每隔一段时间</option><option value="daily">每天</option><option value="weekly">每周</option><option value="once">执行一次</option></select></label>
+    <label id="auto-interval-row">间隔（分钟）<input id="auto-interval" type="number" min="1" max="525600" value="60"></label>
+    <label id="auto-time-row" hidden>时间<input id="auto-time" type="time" value="09:00"></label>
+    <fieldset id="auto-days-row" hidden><legend>星期</legend><div class="automation-days">{% for value,name in [(0,'一'),(1,'二'),(2,'三'),(3,'四'),(4,'五'),(5,'六'),(6,'日')] %}<label><input type="checkbox" name="weekday" value="{{ value }}">{{ name }}</label>{% endfor %}</div></fieldset>
+    <label id="auto-zone-row" hidden>时区<input id="auto-zone" value="Asia/Hong_Kong"></label>
+    <label id="auto-once-row" hidden>一次性执行时间（带时区）<input id="auto-once" placeholder="2026-10-01T09:00:00+08:00"></label>
+    <p id="auto-permission" class="automation-warning"></p>
+    <label class="automation-confirm"><input type="checkbox" id="auto-confirm" required><span>确认在上述权限内无人值守执行，每次会调用模型；需要额外授权的操作不应执行。</span></label>
+    <p id="auto-form-status" role="status"></p>
+    <button id="auto-save" type="submit">确认并创建</button>
+  </form>
+</dialog>
+<dialog id="auto-runs-dialog" class="automation-dialog" aria-labelledby="auto-runs-title"><header class="automation-head"><h2 id="auto-runs-title">运行记录</h2><button type="button" id="auto-runs-close" class="secondary">关闭</button></header><p>每轮完整查询过程与模型回复在原对话；这里记录成功、失败、跳过与待核对。</p><div id="auto-runs"></div></dialog>
+<script src="{{ static_url('/static/automations.js') }}" defer></script>

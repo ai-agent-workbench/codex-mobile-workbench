@@ -1,0 +1,37 @@
+{% macro skill_picker(skills, selected, picker_id, defaults=false) %}
+{% from 'search_icon.html' import search_icon %}
+<section class="skill-picker" data-skill-picker id="{{ picker_id }}" data-defaults="{{ 'true' if defaults else 'false' }}">
+  {% set available_names = skills | selectattr('enabled') | map(attribute='name') | list %}
+  {% set unavailable = selected | reject('in', available_names) | list %}
+  <p class="skill-warning" data-skill-warning role="status" {{ 'hidden' if not unavailable else '' }}>有 {{ unavailable|length }} 项已指定技能无法从当前目录确认，请取消指定或稍后重试。</p>
+  <button type="button" class="skill-clear" data-skill-clear {{ 'hidden' if not selected else '' }}>恢复自动选择</button>
+  <details class="skill-advanced">
+    <summary>技能<span class="skill-mode" data-skill-summary {{ 'hidden' if not selected else '' }}>{{ '已指定 ' ~ selected|length ~ ' 项' if selected else '' }}</span></summary>
+    <label class="skill-search-label">查找技能<span class="search-field"><input type="search" data-skill-search placeholder="输入中文用途或技能名称" aria-label="搜索技能" autocomplete="off">{{ search_icon() }}</span></label>
+    <div class="skill-groups" data-skill-list>
+    {% for group in ['project', 'general', 'dingtalk', 'management'] %}
+      {% set rows = skills | selectattr('group', 'equalto', group) | list %}
+      {% if rows %}<section class="skill-group" data-skill-group><h3>{{ rows[0].group_label }}</h3>
+      {% for skill in rows %}
+        <label class="skill-choice" data-skill-choice data-search="{{ skill.name }} {{ skill.title }} {{ skill.usage }} {{ skill.description }}">
+          <input type="checkbox" name="skills" value="{{ skill.name }}" data-skill-input
+                 {{ 'checked' if skill.name in selected else '' }} {{ 'disabled' if not skill.enabled and skill.name not in selected else '' }}
+                 {{ 'data-unavailable=true' if not skill.enabled else '' }} aria-label="指定技能 {{ skill.name }}">
+          <span><strong>{{ skill.title }}</strong><small>{{ skill.usage }}</small><small class="skill-name">{{ skill.name }}</small>
+            {% if skill.title == skill.name and skill.description %}<small>{{ skill.description }}</small>{% endif %}
+            {% if not skill.enabled %}<small class="skill-warning">{{ skill.unavailable_reason }}</small>{% endif %}</span>
+        </label>
+      {% endfor %}</section>{% endif %}
+    {% endfor %}
+    {% set known = skills | map(attribute='name') | list %}
+    {% for name in selected if name not in known %}
+      <section class="skill-group" data-skill-group><h3>已保存但不可用</h3><label class="skill-choice" data-skill-choice data-search="{{ name }}">
+        <input type="checkbox" name="skills" value="{{ name }}" checked data-skill-input data-unavailable="true" aria-label="指定技能 {{ name }}">
+        <span><strong>{{ name }}</strong><small class="skill-warning">目录中找不到此技能，请取消指定或稍后重试。</small></span>
+      </label></section>
+    {% endfor %}
+    </div>
+    <p class="skill-hint" data-skill-empty hidden>未找到匹配的技能。清空搜索可查看全部。</p>
+  </details>
+</section>
+{% endmacro %}
