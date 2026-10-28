@@ -475,7 +475,10 @@ def write_services(config: dict, installed: dict) -> dict:
               + '\nRestart=on-failure\nRestartSec=3\nTimeoutStopSec=90\n')
     native_text = marker + '[Unit]\nDescription=Codex Workbench local native instance\n' + common
     native_text += 'RuntimeDirectory=' + runtime_name + '\nRuntimeDirectoryMode=0700\nExecStart=:' + ' '.join(map(quote_unit,
-        [str(native_command(config)), 'app-server', '--listen', 'unix://' + environment['CODEX_APP_SERVER_SOCKET']])) + '\n'
+        # systemd rejects certain characters in the executable token even
+        # when quoted. env execs the pinned absolute path as an argument,
+        # without a shell or an extra long-lived process/PID boundary.
+        ['/usr/bin/env', '--', str(native_command(config)), 'app-server', '--listen', 'unix://' + environment['CODEX_APP_SERVER_SOCKET']])) + '\n'
     web_text = marker + '[Unit]\nDescription=Codex Workbench local phone entry\nWants=' + native + '\nAfter=' + native + '\n' + common
     web_text += 'ExecStart=:' + ' '.join(map(quote_unit, ['/usr/bin/python3', '-B', '-I',
         str(root / installed['controller'] / 'launcher.py'), '--state', str(root / 'state'), '--port', str(config['port']), 'web'])) + '\n'

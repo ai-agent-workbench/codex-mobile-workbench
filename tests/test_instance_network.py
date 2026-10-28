@@ -138,6 +138,32 @@ class NetworkPolicyTests(unittest.TestCase):
             self.assertIn(key + '=\"\"\n', contents)
         self.assertEqual((self.root / 'service.env').stat().st_mode & 0o777, 0o600)
 
+    @unittest.skipUnless(shutil.which('systemd-analyze'), 'real user-unit syntax check needs systemd-analyze')
+    def test_real_systemd_parser_accepts_special_instance_executable_path(self):
+        root = self.home / "中文 空格(括号)' $ % & 实例"
+        config = cfg.initialize(root / 'instance.json', {'root': str(root), 'account': 'owner'})
+        binary = root / 'native/bin/codex'
+        binary.parent.mkdir(parents=True)
+        binary.write_text('#!/bin/sh\nexit 0\n'); binary.chmod(0o700)
+        directory = self.home / 'unit-parser-fixture'; directory.mkdir(mode=0o700)
+        run = self.home / 'runtime-fixture'; run.mkdir(mode=0o700)
+        env = {'HOME': str(self.home), 'PATH': '/usr/bin:/bin', 'XDG_RUNTIME_DIR': str(run)}
+        syntax_calls = []
+        def local_step(args, **kwargs):
+            if args[0] == 'systemd-analyze':
+                syntax_calls.append(args)
+                result = subprocess.run(args, env=env, capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, 0, result.stderr)
+            elif args[:3] == ['systemctl', '--user', 'show']:
+                return ('FragmentPath=' + str(directory / args[3]) + '\nDropInPaths=\nLoadState=loaded\nEnvironmentFiles='
+                        + str(root / 'service.env') + ' (ignore_errors=no)\nWorkingDirectory=' + str(root / 'home') + '\n')
+            return ''
+        with mock.patch.object(runtime, 'unit_directory', return_value=directory), \
+                mock.patch.object(runtime, 'user_environment', return_value=env), \
+                mock.patch.object(runtime, 'command', side_effect=local_step):
+            runtime.write_services(config, {'controller': 'controllers/' + 'a' * 16})
+        self.assertEqual(len(syntax_calls), 1)
+
     def test_native_download_uses_policy_environment_and_no_proxy_argument(self):
         config = {**self.config, 'settings': {**self.config['settings'], 'network_mode': 'direct'}}
         with mock.patch.object(runtime, 'network_command', side_effect=cfg.InstanceError('offline')) as download:
