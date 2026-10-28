@@ -49,7 +49,7 @@ class SourcePackageTests(unittest.TestCase):
     def test_plain_python_manager_inspection_does_not_pollute_verified_package(self):
         actual = Path(__file__).resolve().parents[1]
         for name in ('scripts/manage-instance.py','shared/__init__.py',
-                     'shared/instance_config.py','shared/instance_manager.py'):
+                     'shared/instance_config.py','shared/instance_manager.py','shared/instance_network.py'):
             path = self.source / name
             path.parent.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(actual/name,path)

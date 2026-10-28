@@ -91,8 +91,8 @@ class ManagerContractTests(unittest.TestCase):
         self.assertNotIn('OPENAI_API_KEY', environment)
         self.assertEqual(environment['CODEX_WEB_DOT_ENABLED'], '0')
         self.assertEqual(environment['CODEX_HOME'], str(self.root / 'native-home'))
-        self.assertEqual(environment['NO_PROXY'], environment['no_proxy'])
         self.assertIn('127.0.0.1', environment['NO_PROXY'])
+        self.assertIn('internal.example', environment['no_proxy'])
 
     def test_native_record_cannot_authorize_self_consistent_arbitrary_executable(self):
         unexpected = self.root / 'unexpected-executable'
@@ -154,10 +154,11 @@ class ManagerContractTests(unittest.TestCase):
         self.assertEqual(old.read_bytes(), b'preserve this exact tree')
         self.assertEqual({item.name for item in target.iterdir()}, {'keep-unknown'})
 
-    def test_missing_proxy_is_explicit_never_direct(self):
-        with mock.patch.dict(os.environ, {}, clear=True), self.assertRaises(cfg.InstanceError) as error:
-            runtime.proxy()
-        self.assertEqual(error.exception.code, 'proxy_unavailable')
+    def test_missing_proxy_inherit_allows_direct_network_attempt_without_global_mutation(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            environment = runtime.instance_environment(self.config)
+        self.assertEqual(environment['HTTPS_PROXY'], '')
+        self.assertIn('127.0.0.1', environment['NO_PROXY'])
 
     def test_owned_services_are_quoted_and_no_credentials_are_materialized(self):
         directory = self.home / 'user-units'

@@ -368,6 +368,9 @@ namespace CodexWorkbenchPanel
         private readonly ComboBox distributionBox = new ComboBox();
         private readonly TextBox rootBox = new TextBox();
         private readonly TextBox accountBox = new TextBox();
+        private readonly ComboBox networkModeBox = new ComboBox();
+        private readonly TextBox networkProxyBox = new TextBox();
+        private readonly Label networkHintLabel = new Label();
         private readonly TextBox phoneOriginBox = new TextBox();
         private readonly CheckBox automationsBox = new CheckBox();
         private readonly CheckBox completionNoticeBox = new CheckBox();
@@ -401,6 +404,7 @@ namespace CodexWorkbenchPanel
         private string inspectedScope = "";
         private string revision = "";
         private int activityCount;
+        private bool savedNetworkProxy;
 
         internal WorkbenchPanelForm(PanelOptions options, IProcessRunner runner)
         {
@@ -412,6 +416,28 @@ namespace CodexWorkbenchPanel
 
         internal int ActivityCount { get { return activityCount; } }
         internal int CheckItemCount { get { return checksView.Items.Count; } }
+        internal string NetworkHint { get { return networkHintLabel.Text; } }
+
+        internal void SelectNetwork(string mode, string replacement)
+        {
+            networkModeBox.SelectedIndex = mode == "proxy" ? 2 : mode == "direct" ? 1 : 0;
+            networkProxyBox.Text = replacement;
+        }
+
+        internal Dictionary<string, object> ConfigurationInput()
+        {
+            Dictionary<string, object> input = new Dictionary<string, object>();
+            input["phone_origin"] = phoneOriginBox.Text.Trim();
+            input["automations"] = automationsBox.Checked;
+            input["completion_notifications"] = completionNoticeBox.Checked;
+            input["notification_command"] = notificationCommandBox.Text.Trim();
+            input["notification_topic_file"] = notificationTopicBox.Text.Trim();
+            input["network_mode"] = networkModeBox.SelectedIndex == 2 ? "proxy" : networkModeBox.SelectedIndex == 1 ? "direct" : "inherit";
+            input["network_proxy"] = networkModeBox.SelectedIndex == 2 && !String.IsNullOrWhiteSpace(networkProxyBox.Text)
+                ? networkProxyBox.Text.Trim() : null;
+            input["expected_revision"] = revision;
+            return input;
+        }
 
         internal void ApplyInspectionFixture(Dictionary<string, object> data, string distribution, string root)
         {
@@ -460,6 +486,8 @@ namespace CodexWorkbenchPanel
         {
             control.Visible = true;
             control.CreateControl();
+            // Force hidden native controls to render their selected text.
+            IntPtr nativeHandle = control.Handle;
             foreach (Control child in control.Controls)
             {
                 CreateControlsForDiagnostic(child);
@@ -594,32 +622,56 @@ namespace CodexWorkbenchPanel
         private Control BuildConfigurationGroup()
         {
             GroupBox group = new GroupBox();
-            group.Text = "手机入口与内置可选模块";
+            group.Text = "联网、手机入口与可选模块";
             group.Dock = DockStyle.Fill;
-            TableLayoutPanel table = NewTable(2, 10);
-            group.Controls.Add(table);
-            AddRow(table, 0, "手机 HTTPS 入口", phoneOriginBox, "例如 https://example.invalid");
+            Panel scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+            group.Controls.Add(scroll);
+            TableLayoutPanel table = NewTable(2, 13);
+            table.Dock = DockStyle.Top;
+            scroll.Controls.Add(table);
+            networkModeBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            networkModeBox.Items.AddRange(new object[] { "沿用现有 WSL 配置（推荐）", "明确直连（不使用代理变量）", "指定 HTTP(S) 代理" });
+            networkModeBox.SelectedIndexChanged += delegate { UpdateNetworkInputs(); };
+            AddRow(table, 0, "联网方式", networkModeBox, "只影响本实例，不修改 Windows、WSL 或系统 VPN；代理失败不自动转直连。");
+            networkProxyBox.UseSystemPasswordChar = true;
+            AddRow(table, 1, "指定代理", networkProxyBox, "仅指定代理时填写；地址保存在本人实例中，运行检查不会回显。留空可保留已保存的指定代理。");
+            networkHintLabel.AutoSize = true;
+            networkHintLabel.MaximumSize = new Size(260, 0);
+            table.Controls.Add(networkHintLabel, 1, 2);
+            networkModeBox.SelectedIndex = 0;
+            AddRow(table, 3, "手机 HTTPS 入口", phoneOriginBox, "例如 https://example.invalid");
             httpsHelpButton = new Button();
             httpsHelpButton.Text = "HTTPS 准备说明";
             httpsHelpButton.AutoSize = true;
             httpsHelpButton.Click += delegate { ShowHttpsHelp(); };
-            table.Controls.Add(httpsHelpButton, 1, 1);
+            table.Controls.Add(httpsHelpButton, 1, 4);
             localAddressLabel.AutoSize = true;
             localAddressLabel.Text = "本机地址：未检查";
-            table.Controls.Add(localAddressLabel, 1, 2);
+            table.Controls.Add(localAddressLabel, 1, 5);
             automationsBox.Text = "启用定时任务模块";
             completionNoticeBox.Text = "启用完成通知模块";
-            table.Controls.Add(automationsBox, 1, 3);
-            table.Controls.Add(completionNoticeBox, 1, 4);
-            AddRow(table, 5, "通知发送器路径", notificationCommandBox, "可选；只填路径");
-            AddRow(table, 6, "通知主题文件路径", notificationTopicBox, "可选；只填路径，不填秘密");
-            configureButton = ActionButton("保存设置（重启后生效）", "configure", async delegate { await ConfigureAsync(); }, false);
+            table.Controls.Add(automationsBox, 1, 6);
+            table.Controls.Add(completionNoticeBox, 1, 7);
+            AddRow(table, 8, "通知发送器路径", notificationCommandBox, "可选；只填路径");
+            AddRow(table, 9, "通知主题文件路径", notificationTopicBox, "可选；只填路径，不填秘密");
+            configureButton = ActionButton("保存设置（服务重启后生效）", "configure", async delegate { await ConfigureAsync(); }, false);
             loginButton = ActionButton("原生账号登录（打开终端）", "login", async delegate { await StartLoginAsync(); }, false);
             authorizeButton = ActionButton("绑定手机", "authorize-phone", async delegate { await AuthorizePhoneAsync(); }, false);
-            table.Controls.Add(configureButton, 1, 7);
-            table.Controls.Add(loginButton, 1, 8);
-            table.Controls.Add(authorizeButton, 1, 9);
+            table.Controls.Add(configureButton, 1, 10);
+            table.Controls.Add(loginButton, 1, 11);
+            table.Controls.Add(authorizeButton, 1, 12);
             return group;
+        }
+
+        private void UpdateNetworkInputs()
+        {
+            bool explicitProxy = networkModeBox.SelectedIndex == 2;
+            networkProxyBox.Enabled = explicitProxy && !busy;
+            networkHintLabel.Text = explicitProxy
+                ? (savedNetworkProxy ? "已保存指定代理；留空保留，填写新地址则替换。" : "填写 WSL 可访问的 HTTP(S) 代理地址；只保存到本实例。")
+                : networkModeBox.SelectedIndex == 1
+                    ? "不使用代理变量；不会关闭系统 VPN、TUN 或更改路由。"
+                    : "沿用 WSL 环境变量，不自动读取 Windows 系统代理。大小写冲突时小写优先。";
         }
 
         private static TableLayoutPanel NewTable(int columns, int rows)
@@ -759,14 +811,7 @@ namespace CodexWorkbenchPanel
 
         private async Task ConfigureAsync()
         {
-            Dictionary<string, object> input = new Dictionary<string, object>();
-            input["phone_origin"] = phoneOriginBox.Text.Trim();
-            input["automations"] = automationsBox.Checked;
-            input["completion_notifications"] = completionNoticeBox.Checked;
-            input["notification_command"] = notificationCommandBox.Text.Trim();
-            input["notification_topic_file"] = notificationTopicBox.Text.Trim();
-            input["expected_revision"] = revision;
-            await RunActionAsync("configure", input, "模块配置已保存，正在刷新检查。");
+            await RunActionAsync("configure", ConfigurationInput(), "设置已保存，正在刷新检查；后台服务需显式重启。");
         }
 
         private async Task StopOrRestartAsync(string action)
@@ -915,7 +960,7 @@ namespace CodexWorkbenchPanel
 
         private static void ShowHttpsHelp()
         {
-            MessageBox.Show("填写 HTTPS 地址不会自动开通入口。请先准备受控反向代理或私有网络入口、有效 HTTPS 证书和到本机服务的受限转发；随后运行检查确认。面板不会修改端口、组网或防火墙。", "HTTPS 准备说明", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("手机接入有两类选择：\n\n私有组网：只供自己的设备访问，手机通常需安装组网客户端；仍使用独立的可信 HTTPS 与本人认证。\n\n托管 HTTPS：手机可只用浏览器，但需核对第三方中转、隐私、费用与稳定性；临时随机网址不适合长期绑定。\n\n两条路线均须保留 WebSocket、屏蔽 /internal、只转发本实例的回环端口；不暴露原生 App Server。\n\n保存地址不会开通网络，电脑检查不能证明手机可达。先运行本实例，再用手机在实际网络打开入口验证，最后绑定；详见同包 docs/PHONE_ACCESS.md。面板不修改端口、组网或防火墙，也不默认推荐服务商。", "手机 HTTPS 接入说明", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private async Task AuthorizePhoneAsync()
@@ -980,11 +1025,13 @@ namespace CodexWorkbenchPanel
             distributionBox.Enabled = !value;
             rootBox.Enabled = !value;
             accountBox.Enabled = !value;
+            networkModeBox.Enabled = !value;
             phoneOriginBox.Enabled = !value;
             automationsBox.Enabled = !value;
             completionNoticeBox.Enabled = !value;
             notificationCommandBox.Enabled = !value;
             notificationTopicBox.Enabled = !value;
+            UpdateNetworkInputs();
             UpdateActionButtons();
         }
 
@@ -1127,6 +1174,10 @@ namespace CodexWorkbenchPanel
                 completionNoticeBox.Checked = GetBoolean(settings, "completion_notifications");
                 notificationCommandBox.Text = ManagerResponse.GetString(settings, "notification_command");
                 notificationTopicBox.Text = ManagerResponse.GetString(settings, "notification_topic_file");
+                savedNetworkProxy = ManagerResponse.GetString(settings, "network_mode") == "proxy"
+                    && GetValue(data, "network", "proxy_configured") is bool && (bool)GetValue(data, "network", "proxy_configured");
+                SelectNetwork(ManagerResponse.GetString(settings, "network_mode"), "");
+                UpdateNetworkInputs();
             }
             Dictionary<string, object> phoneEntry = data.ContainsKey("phone_entry") ? data["phone_entry"] as Dictionary<string, object> : null;
             if (phoneEntry == null)
@@ -1463,6 +1514,8 @@ namespace CodexWorkbenchPanel
                 configureInput["completion_notifications"] = false;
                 configureInput["notification_command"] = "";
                 configureInput["notification_topic_file"] = "";
+                configureInput["network_mode"] = "inherit";
+                configureInput["network_proxy"] = null;
                 configureInput["expected_revision"] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
                 Assert(client.InvokeAsync(distribution, instanceRoot, "configure", configureInput).GetAwaiter().GetResult().Ok, "configure revision");
                 Dictionary<string, object> initializeInput = new Dictionary<string, object>();
@@ -1495,6 +1548,23 @@ namespace CodexWorkbenchPanel
                     form.ApplyInspectionFixture(initialFixture, distribution, instanceRoot);
                     Assert(form.IsActionEnabled("initialize") && form.IsActionEnabled("restore") && !form.IsActionEnabled("start") && !form.IsActionEnabled("configure"), "无实例 absent revision 可直接恢复，不能启动或配置");
                     form.ApplyInspectionFixture(inspection.Data, distribution, instanceRoot);
+                    form.SelectNetwork("proxy", "http://fixture-user:fixture-password@proxy.invalid:8080");
+                    Dictionary<string, object> proxyInput = form.ConfigurationInput();
+                    Assert((string)proxyInput["network_mode"] == "proxy" && (string)proxyInput["network_proxy"] == "http://fixture-user:fixture-password@proxy.invalid:8080", "指定代理通过 JSON stdin 发送，不放命令行");
+                    form.SelectNetwork("proxy", "");
+                    Assert(form.ConfigurationInput()["network_proxy"] == null, "空代理输入保留私有已保存值，不由运行检查回显");
+                    form.SelectNetwork("direct", "http://unused.invalid:8080");
+                    Assert((string)form.ConfigurationInput()["network_mode"] == "direct" && form.ConfigurationInput()["network_proxy"] == null, "直连不会携带残留输入");
+                    Dictionary<string, object> inheritedProxy = serializer.Deserialize<Dictionary<string, object>>(serializer.Serialize(inspection.Data));
+                    ((Dictionary<string, object>)inheritedProxy["settings"])["network_mode"] = "inherit";
+                    inheritedProxy["network"] = new Dictionary<string, object> { { "proxy_configured", true } };
+                    form.ApplyInspectionFixture(inheritedProxy, distribution, instanceRoot);
+                    form.SelectNetwork("proxy", "");
+                    Assert(!form.NetworkHint.Contains("已保存指定代理"), "继承代理不能误报为已保存指定地址");
+                    ((Dictionary<string, object>)inheritedProxy["settings"])["network_mode"] = "proxy";
+                    form.ApplyInspectionFixture(inheritedProxy, distribution, instanceRoot);
+                    Assert(form.NetworkHint.Contains("已保存指定代理") && form.ConfigurationInput()["network_proxy"] == null, "指定代理已保存时留空可以保留");
+                    form.ApplyInspectionFixture(inspection.Data, distribution, instanceRoot);
                     Assert(form.IsActionEnabled("start") && form.IsActionEnabled("configure") && form.IsActionEnabled("backup") && !form.IsActionEnabled("initialize"), "已实例按钮状态");
                     string recoveredRoot = instanceRoot + "-recovered";
                     string recoveredScope = form.SelectRestoredRoot(new Dictionary<string, object> { { "root", recoveredRoot } });
@@ -1512,6 +1582,16 @@ namespace CodexWorkbenchPanel
                     Assert(form.CheckItemCount >= 4, "真实 JSON checks 未丢失");
                     if (!String.IsNullOrEmpty(renderPath))
                     {
+                        Dictionary<string, object> settings = inspection.Data["settings"] as Dictionary<string, object>;
+                        settings["network_mode"] = "inherit";
+                        List<object> checks = new List<object>();
+                        foreach (object item in (IList)inspection.Data["checks"]) { checks.Add(item); }
+                        checks.Add(new Dictionary<string, object> { { "name", "network_policy" }, { "title", "联网方式" }, { "status", "not_checked" }, { "detail", "沿用现有 WSL 配置；没有进行联网测试。" } });
+                        checks.Add(new Dictionary<string, object> { { "name", "native_login" }, { "title", "原生账号登录" }, { "status", "ok" }, { "detail", "仅本地登录状态，不等于模型可用。" } });
+                        checks.Add(new Dictionary<string, object> { { "name", "model_connection" }, { "title", "模型实际连接" }, { "status", "not_checked" }, { "detail", "以首次任务返回为准，不自动调用模型。" } });
+                        checks.Add(new Dictionary<string, object> { { "name", "phone_connection" }, { "title", "手机当前可达" }, { "status", "not_checked" }, { "detail", "需手机在实际网络打开入口。" } });
+                        inspection.Data["checks"] = checks;
+                        form.ApplyInspectionFixture(inspection.Data, distribution, instanceRoot);
                         form.RenderDiagnostic(renderPath);
                         Assert(File.Exists(renderPath), "PNG 渲染诊断");
                     }

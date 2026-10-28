@@ -18,6 +18,7 @@ import sys
 from urllib.parse import urlsplit
 
 from shared import instance_config as cfg
+from shared import instance_network as network
 
 
 SOURCE = Path(__file__).resolve().parents[1]
@@ -90,10 +91,17 @@ def inspect(path: Path) -> dict:
         checks.append(check('user_services', '本人 WSL 用户服务', 'ok'))
     except cfg.InstanceError:
         checks.append(check('user_services', '本人 WSL 用户服务', 'missing', '需要可用的 systemd 用户服务。'))
+    options = config['settings'] if config else {'network_mode': 'inherit', 'network_proxy': ''}
+    network_state = {**network.summary(options, os.environ),
+                     'note': '下载与下次原生登录使用已保存配置；后台服务在显式启动或重启后生效。'
+                             '不自动读取 Windows 系统代理，也未测试模型或手机连通性。'}
+    checks.append(check('network_policy', '联网方式', 'not_checked', network_state['description']))
     if config is None:
         return {'instance_found': False, 'root': str(path.parent), 'account': '', 'revision': 'absent',
                 'local_address': None,
-                'settings': {}, 'checks': checks + [check('instance', '实例安装准备', 'missing')],
+                'settings': {'network_mode': 'inherit', 'network_proxy': ''},
+                'network': network_state,
+                'checks': checks + [check('instance', '实例安装准备', 'missing')],
                 'services': {'web': 'not_installed', 'app_server': 'not_installed'},
                 'phone_entry': None, 'native_login': 'not_checked', 'warnings': []}
     root = Path(config['root'])
@@ -125,8 +133,12 @@ def inspect(path: Path) -> dict:
             login_state = 'ready' if result.returncode == 0 else 'missing'
         except (OSError, subprocess.TimeoutExpired):
             login_state = 'missing'
-    checks.append(check('native_login', '本人的原生 Codex 登录', 'ok' if login_state == 'ready' else login_state,
+    checks.append(check('native_login', '原生账号登录', 'ok' if login_state == 'ready' else login_state,
                         '仅核对独立实例的本地登录状态，不调用模型、不复制其他登录。'))
+    checks.append(check('model_connection', '模型实际连接', 'not_checked',
+                        '账号已登录不等于模型可用；以首次任务实际返回为准，本检查不调用模型。'))
+    checks.append(check('phone_connection', '手机当前可达', 'not_checked',
+                        '需手机在实际使用的网络打开入口；保存地址或已有绑定不代替这项验证。'))
     entry = {'url': origin + '/login', 'qr_matrix': None} if origin else None
     if entry is not None and installed.is_file():
         # QR is rendered by the installed core runtime, not a Windows dependency.
@@ -137,15 +149,18 @@ def inspect(path: Path) -> dict:
         except (ImportError, cfg.InstanceError):
             pass
     warnings = ['安装、本人原生登录、手机 HTTPS 连接及手机本人验证是不同检查，不能互相替代。']
+    public_settings = {**config['settings'], 'network_proxy': ''}
     return {'instance_found': True, 'root': config['root'], 'account': config['account'],
-            'settings': config['settings'], 'revision': revision(config), 'checks': checks,
+            'settings': public_settings, 'network': network_state, 'revision': revision(config), 'checks': checks,
             'local_address': 'http://127.0.0.1:' + str(config['port']),
             'services': {'web': unit_status(web), 'app_server': unit_status(native)},
             'phone_entry': entry, 'native_login': login_state, 'warnings': warnings}
 
 
 def configure(path: Path, value: dict) -> dict:
-    if set(value) != cfg.SETTINGS | {'expected_revision'}:
+    legacy = cfg.LEGACY_SETTINGS | {'expected_revision'}
+    allowed = legacy | {'network_mode', 'network_proxy'}
+    if type(value) is not dict or not legacy <= set(value) or not set(value) <= allowed:
         raise cfg.InstanceError('请先重新检查实例，再保存完整部署设置。', 'invalid_config')
     with cfg.exclusive(path):
         config = cfg.read(path)
@@ -153,7 +168,19 @@ def configure(path: Path, value: dict) -> dict:
             raise cfg.InstanceError('尚未准备实例。', 'not_initialized')
         if value['expected_revision'] != revision(config):
             raise cfg.InstanceError('部署设置已被其他操作更改；请重新检查后比较，未覆盖。', 'revision_conflict')
-        options = cfg.settings({key: value[key] for key in cfg.SETTINGS})
+        # Old five-field panel payloads deliberately preserve the private
+        # network choice.  A mode-only/new null proxy retains a saved proxy;
+        # moving away from proxy clears it so it cannot revive later.
+        options_input = {key: value[key] for key in cfg.LEGACY_SETTINGS}
+        mode = value.get('network_mode', config['settings']['network_mode'])
+        supplied_proxy = value.get('network_proxy', None)
+        if mode == 'proxy':
+            selected = config['settings']['network_proxy'] if supplied_proxy is None else supplied_proxy
+            if not selected:
+                raise cfg.InstanceError('请选择有效的指定代理地址后再保存。', 'invalid_network_proxy')
+        else:
+            selected = ''
+        options = cfg.settings({**options_input, 'network_mode': mode, 'network_proxy': selected})
         if options['phone_origin'] != config['settings']['phone_origin'] and credential_exists(config):
             raise cfg.InstanceError('已有手机绑定；更换 HTTPS 来源需要单独迁移认证，未自动替换或撤销。', 'bound_origin_change')
         if options['completion_notifications']:
@@ -164,7 +191,8 @@ def configure(path: Path, value: dict) -> dict:
         config = {**config, 'settings': options}
         cfg.write_json(path, config)
         return {'revision': revision(config), 'restart_required': True,
-                'note': '仅保存此实例的部署设置；重启后生效，未更改网关、组网或防火墙。'}
+                'note': '仅保存此实例的部署设置；下载和下次原生登录立即使用，后台服务需显式启动或重启。'
+                        '未更改网关、组网或防火墙。'}
 
 
 def input_object() -> dict:

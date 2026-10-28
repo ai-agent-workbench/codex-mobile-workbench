@@ -23,6 +23,7 @@ import time
 import uuid
 
 from shared import instance_config as cfg
+from shared import instance_network as network
 from shared.instance_manager import units, user_environment, unit_status
 from shared import runtime_bundle as bundle
 from shared import runtime_release as release
@@ -65,6 +66,7 @@ def command(args: list[str], *, env=None, cwd=None, timeout=30, stdin=None) -> s
 
 
 def instance_environment(config: dict) -> dict[str, str]:
+    """Environment for native, installer and runtime children only."""
     env = os.environ.copy()
     for key in ('PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP', 'PYTHONUSERBASE',
                 'OPENAI_API_KEY', 'CODEX_API_KEY', 'OPENAI_ACCESS_TOKEN'):
@@ -74,16 +76,23 @@ def instance_environment(config: dict) -> dict[str, str]:
         if key.startswith('CODEX_WEB_') or key == 'CODEX_APP_SERVER_SOCKET':
             env.pop(key)
     env.update(cfg.environment(config))
-    env['NO_PROXY'] = ','.join(filter(None, [env.get('NO_PROXY', env.get('no_proxy', '')), 'localhost,127.0.0.1,::1']))
-    env['no_proxy'] = env['NO_PROXY']
+    try:
+        env.update(network.policy(config['settings'], env))
+    except ValueError:
+        # Config validation normally catches this; never expose a private URL
+        # if a caller handed us an unchecked in-memory object.
+        raise cfg.InstanceError('网络设置无效，未启动或下载。', 'invalid_network_proxy') from None
     return env
 
 
-def proxy() -> str:
-    value = next((os.environ[key] for key in ('HTTPS_PROXY', 'https_proxy', 'ALL_PROXY', 'all_proxy') if os.environ.get(key)), '')
-    if not value:
-        raise cfg.InstanceError('未找到当前网络代理；请先在 WSL 配好现有代理，再重试下载。未尝试绕过代理直连。', 'proxy_unavailable')
-    return value
+def network_command(args: list[str], *, env: dict[str, str], timeout: int,
+                    mode: str, phase: str, code: str, cwd=None) -> str:
+    """Run one network stage exactly once without exposing child output/URLs."""
+    try:
+        return command(args, env=env, cwd=cwd, timeout=timeout)
+    except (cfg.InstanceError, OSError, subprocess.TimeoutExpired):
+        label = network.LABELS.get(mode, '未知')
+        raise cfg.InstanceError(f'{phase}失败（网络方式：{label}）；未自动切换网络路径。', code) from None
 
 
 def native_command(config: dict) -> Path:
@@ -269,9 +278,11 @@ def install_native(config: dict) -> tuple[dict, Path | None]:
     if not archive.exists() or digest(archive) != native.ARCHIVE_SHA256 or archive.stat().st_size != native.ARCHIVE_SIZE:
         temporary = root / ('.download-' + uuid.uuid4().hex)
         try:
-            command(['curl', '--silent', '--show-error', '--fail', '--location', '--proto', '=https',
-                '--proto-redir', '=https', '--tlsv1.2', '--proxy', proxy(), '--noproxy', '',
-                '--max-time', '900', '--output', str(temporary), native.URL], timeout=930)
+            env = instance_environment(config)
+            network_command(['curl', '--disable', '--silent', '--show-error', '--fail', '--location', '--proto', '=https',
+                '--proto-redir', '=https', '--tlsv1.2', '--max-time', '900', '--output', str(temporary), native.URL],
+                env=env, timeout=930, mode=config['settings']['network_mode'],
+                phase='原生程序下载', code='native_download_failed')
             temporary.chmod(0o600)
             if temporary.stat().st_size != native.ARCHIVE_SIZE or digest(temporary) != native.ARCHIVE_SHA256:
                 raise cfg.InstanceError('官方固定版本的文件大小或校验值不匹配，未运行。', 'native_digest_mismatch')
@@ -438,14 +449,14 @@ def write_services(config: dict, installed: dict) -> dict:
     web, native = units(config)
     marker = '# CodexWorkbench local instance ' + config['instance_id'] + '\n'
     runtime_name = 'codex-web-' + config['instance_id']
+    # Use the exact same policy as downloads and native login.  Every proxy
+    # key is emitted (including empty values) so a user systemd manager cannot
+    # leak stale global proxy values into this instance.
     environment = cfg.environment(config)
-    # Only deployment values and the current network environment, not CLI keys
-    # or another HOME's authentication, are materialized in this private file.
-    for key in ('HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY', 'NO_PROXY', 'https_proxy', 'http_proxy', 'all_proxy', 'no_proxy'):
-        if os.environ.get(key):
-            environment[key] = os.environ[key]
-    environment['NO_PROXY'] = ','.join(filter(None, [environment.get('NO_PROXY', environment.get('no_proxy', '')), 'localhost,127.0.0.1,::1']))
-    environment['no_proxy'] = environment['NO_PROXY']
+    try:
+        environment.update(network.policy(config['settings'], os.environ))
+    except ValueError:
+        raise cfg.InstanceError('网络设置无效，未写入服务。', 'invalid_network_proxy') from None
     envpath = root / 'service.env'
     contents = ''.join(key + '=' + json.dumps(value, ensure_ascii=False) + '\n' for key, value in sorted(environment.items()))
     if envpath.exists():
@@ -614,11 +625,13 @@ def install(config: dict, source: Path) -> dict:
     env = instance_environment(config)
     command(['/usr/bin/python3', '-I', '-m', 'venv', str(stage / '.venv')], env=env, timeout=60)
     python = stage / '.venv/bin/python'
-    command([str(python), '-I', '-m', 'pip', '--isolated', 'install', '--index-url', 'https://pypi.org/simple',
-        '--proxy', proxy(), '--disable-pip-version-check', '-r', str(stage / 'source/requirements-core.lock')],
-        env=env, timeout=900)
+    pip_env = network.pip_environment(env)
+    network_command([str(python), '-I', '-m', 'pip', '--isolated', 'install', '--index-url', 'https://pypi.org/simple',
+        '--disable-pip-version-check', '-r', str(stage / 'source/requirements-core.lock')],
+        env=pip_env, timeout=900, mode=config['settings']['network_mode'],
+        phase='依赖下载', code='dependency_download_failed')
     command([str(python), '-I', str(stage / 'source/scripts/check-core-deps.py')], env=env)
-    command([str(python), '-I', '-m', 'pip', 'check'], env=env)
+    command([str(python), '-I', '-m', 'pip', '--isolated', 'check'], env=pip_env)
     native_metadata, native_previous = install_native(config)
     try:
         controller, hashes = install_controller(stage / 'source', root)

@@ -23,8 +23,9 @@ class InstanceError(ValueError):
         self.code = code
 
 
-SETTINGS = {'phone_origin', 'automations', 'completion_notifications',
-            'notification_command', 'notification_topic_file'}
+LEGACY_SETTINGS = {'phone_origin', 'automations', 'completion_notifications',
+                   'notification_command', 'notification_topic_file'}
+SETTINGS = LEGACY_SETTINGS | {'network_mode', 'network_proxy'}
 
 
 def absolute_path(value: str) -> Path:
@@ -75,9 +76,24 @@ def phone_origin(value: object) -> str:
 
 
 def settings(value: object) -> dict:
-    if type(value) is not dict or set(value) != SETTINGS:
+    # Version-1 profiles used the five deployment fields.  Read them as the
+    # safe default without rewriting until a caller explicitly saves.
+    if type(value) is not dict or set(value) != LEGACY_SETTINGS and set(value) != SETTINGS:
         raise InstanceError('部署配置字段不完整或包含未知内容。', 'invalid_config')
     output = dict(value)
+    output.setdefault('network_mode', 'inherit')
+    output.setdefault('network_proxy', '')
+    if not isinstance(output['network_mode'], str) or output['network_mode'] not in {'inherit', 'direct', 'proxy'}:
+        raise InstanceError('网络方式无效，未保存。', 'invalid_network_mode')
+    if not isinstance(output['network_proxy'], str):
+        raise InstanceError('代理地址无效，未保存。', 'invalid_network_proxy')
+    if output['network_mode'] == 'proxy':
+        from shared.instance_network import valid_proxy
+        if not valid_proxy(output['network_proxy']):
+            raise InstanceError('指定代理地址无效或缺失，未保存。', 'invalid_network_proxy')
+    elif output['network_proxy']:
+        # A proxy is meaningful only when explicitly selected.
+        output['network_proxy'] = ''
     for key in ('automations', 'completion_notifications'):
         if type(output[key]) is not bool:
             raise InstanceError('可选功能必须明确选择启用或停用。', 'invalid_config')
@@ -211,7 +227,8 @@ def new_profile(path: Path, payload: dict) -> dict:
     value = validate({'format_version': 1, 'instance_id': uuid.uuid4().hex[:12],
         'root': str(root), 'account': payload['account'], 'port': port,
         'settings': {'phone_origin': '', 'automations': False, 'completion_notifications': False,
-                     'notification_command': '', 'notification_topic_file': ''}}, path)
+                     'notification_command': '', 'notification_topic_file': '',
+                     'network_mode': 'inherit', 'network_proxy': ''}}, path)
     return value
 
 
