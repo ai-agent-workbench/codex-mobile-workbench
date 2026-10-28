@@ -1,5 +1,7 @@
 # 安装与维护说明
 
+[简体中文](INSTALL.md) · [English](INSTALL.en.md)
+
 第一次安装，请按[快速开始](docs/QUICKSTART.md)操作。本页保留安装环境、联网和维护细节，不必在首次使用前通读。
 
 ## 安装环境
@@ -55,7 +57,7 @@ Windows 构建见 [`desktop/README.md`](desktop/README.md)。成品与同包源�
 python3 scripts/build-desktop-package.py --panel-exe /absolute/task-output/CodexWorkbenchPanel.exe --destination /absolute/task-output/CodexWorkbench
 ```
 
-只从干净固定 Git 版本导出文件，不复制私有 Git 历史、原 HOME 或状态；安装包自带内容校验清单，无 `.git` 时也可独立重建。校验能发现损坏，**不代替发行者身份／签名或 C 阶段的公开发布审计**。此命令不会上传或公开。
+只从干净固定 Git 版本导出文件，不复制私有 Git 历史、原 HOME 或状态；安装包自带内容校验清单，无 `.git` 时也可独立重建。校验能发现损坏，**不代替发行者身份／签名或公开发布核验**。此命令不会上传或公开。
 
 `manage-instance.py --config <实例>/instance.json inspect` 不更改部署设置或服务，不发起模型任务；原生登录状态查询可能在该实例的 native HOME 创建临时目录。其他动作由面板调用，不是远程管理 API。不要让新面板接管任何已有生产实例；本候选不包含作者的私人生产发布／网关工具。
 
