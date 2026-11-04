@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import stat
 import tempfile
 import unittest
@@ -100,6 +101,66 @@ class WorkbenchSettingsStoreTests(unittest.TestCase):
         with ThreadPoolExecutor(max_workers=2) as pool:
             self.assertEqual(sorted(pool.map(save,['first','second'])),[False,True])
         self.assertEqual(self.store.read_account('one')['revision'],2)
+
+    def test_permission_choice_is_explicit_atomic_and_ordinary_saves_preserve_it(self):
+        self.assertFalse(self.store.permission_choice_completed('one'))
+        selected = self.store.complete_permission_choice('one', 0, 'workspace-write')
+        self.assertEqual(selected['revision'], 1)
+        self.assertEqual(selected['defaults']['permission'], 'workspace-write')
+        self.assertTrue(self.store.permission_choice_completed('one'))
+        # An ordinary account save may reset defaults but must not erase the
+        # separate explicit-completion evidence.
+        self.store.save_account('one', 1, {'defaults': {}})
+        self.assertTrue(self.store.permission_choice_completed('one'))
+        self.assertEqual(self.store.resolve('one')['values']['permission'], system_defaults()['permission'])
+        with self.assertRaises(SettingsConflict):
+            self.store.complete_permission_choice('one', 1, 'read-only')
+        self.assertTrue(self.store.permission_choice_completed('one'))
+
+    def test_permission_choice_concurrent_compare_and_swap_has_one_winner(self):
+        from concurrent.futures import ThreadPoolExecutor
+        self.store.save_account('one', 0, {'personal': 'base'})
+        def complete(value):
+            try:
+                self.store.complete_permission_choice('one', 1, value)
+                return True
+            except SettingsConflict:
+                return False
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual(sorted(pool.map(complete, ['read-only', 'danger-full-access'])), [False, True])
+        account = self.store.read_account('one')
+        self.assertEqual(account['revision'], 2)
+        self.assertIn(account['defaults']['permission'], {'read-only', 'danger-full-access'})
+        self.assertTrue(self.store.permission_choice_completed('one'))
+
+    def test_cold_permission_choice_concurrent_first_writers_have_one_winner(self):
+        from concurrent.futures import ThreadPoolExecutor
+        def complete(value):
+            try:
+                self.store.complete_permission_choice('one', 0, value)
+                return True
+            except SettingsConflict:
+                return False
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual(sorted(pool.map(complete, ['read-only', 'workspace-write'])), [False, True])
+        self.assertTrue(self.store.permission_choice_completed('one'))
+
+    def test_permission_choice_damaged_state_fails_closed_and_old_schema_stays_read_only(self):
+        self.store.complete_permission_choice('one', 0, 'read-only')
+        with sqlite3.connect(self.path) as db:
+            db.execute("UPDATE workbench_account_settings SET permission_choice_completed = 2")
+        with self.assertRaises(ValueError):
+            self.store.permission_choice_completed('one')
+        legacy = Path(self.temp.name) / 'legacy.sqlite3'
+        with sqlite3.connect(legacy) as db:
+            db.execute('CREATE TABLE workbench_account_settings (account TEXT PRIMARY KEY, revision INTEGER NOT NULL, defaults_json TEXT NOT NULL, personal TEXT NOT NULL, previous_personal TEXT, presets_json TEXT NOT NULL)')
+            db.execute("INSERT INTO workbench_account_settings VALUES ('old', 0, '{}', '', NULL, '[]')")
+        old_store = SettingsStore(legacy)
+        self.assertFalse(old_store.permission_choice_completed('old'))
+        # A read did not migrate the old schema.
+        with sqlite3.connect(legacy) as db:
+            columns = {row[1] for row in db.execute('PRAGMA table_info(workbench_account_settings)')}
+        self.assertNotIn('permission_choice_completed', columns)
 
     def test_results_are_detached_and_database_is_private(self):
         saved = self.store.save_account("one", 0, {"defaults": {"skills": ["skill"]}})

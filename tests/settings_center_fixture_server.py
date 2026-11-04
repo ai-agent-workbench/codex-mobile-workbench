@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import copy
 import shutil
 import socket
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -22,7 +23,7 @@ from engine.conversation_service import ConversationService
 from engine.conversation_store import ConversationStore
 from shared.conversation_artifacts import ConversationArtifactService
 from shared.workbench_settings import SettingsStore
-from shared import project_rules, conversation_defaults
+from shared import project_rules, conversation_defaults, permission_choice, workbench_settings
 from shared import config as shared_config
 from shared.skill_catalog import LABELS
 from routes import settings_center, misc, conversations, conversation_api, automations, projects as project_routes
@@ -38,6 +39,10 @@ def main():
         settings=SettingsStore(root/'state'/'settings.sqlite3')
         settings_center.settings_store=lambda:settings
         conversation_defaults.settings_store=lambda:settings
+        permission_choice.settings_store=lambda:settings
+        if '--permission-choice' in sys.argv:
+            permission_choice.PERMISSION_CHOICE_REQUIRED=True
+            workbench_settings.PERMISSION_CHOICE_REQUIRED=True
         project_routes.settings_store=lambda:settings
         store=ConversationStore(root/'state'/'conversations.sqlite3')
         artifacts=ConversationArtifactService(store,root/'artifacts')
@@ -112,6 +117,18 @@ def main():
         def conflict():
             current=settings.read_account('browser');settings.save_account('browser',current['revision'],{'personal':'其他页面刚修改'})
             return {'ok':True}
+        @app.post('/fixture/permission-reset')
+        def permission_reset():
+            connection=settings._write_connection()
+            try:
+                connection.execute("DELETE FROM workbench_account_settings WHERE account='browser'")
+            finally:
+                connection.close()
+            return {'ok':True}
+        @app.get('/fixture/permission-state')
+        def permission_state():
+            return {'completed':settings.permission_choice_completed('browser'),
+                    'values':settings.resolve('browser')['values']}
         @app.post('/fixture/external-rule')
         def external_rule():
             (projects.ROOT/'fixture'/'AGENTS.md').write_text('外部修改，请勿覆盖')

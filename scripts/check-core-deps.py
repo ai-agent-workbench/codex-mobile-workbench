@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 import sys
 
-_ENTRY = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([A-Za-z0-9][A-Za-z0-9._+!-]*)$")
+_ENTRY = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([A-Za-z0-9][A-Za-z0-9._+!-]*)(?P<hashes>(?: --hash=sha256:[0-9a-f]{64})*)$")
 
 
 class LockFileError(ValueError):
@@ -20,7 +20,7 @@ def _canonical_name(name: str) -> str:
 
 
 def read_lock(lock_path: Path) -> list[tuple[str, str]]:
-    """Read one exact ``name==version`` per line without executing input."""
+    """Read exact versions and optional SHA-256 wheel locks without executing input."""
     entries: list[tuple[str, str]] = []
     names: set[str] = set()
     try:
@@ -28,11 +28,16 @@ def read_lock(lock_path: Path) -> list[tuple[str, str]]:
     except (OSError, UnicodeError) as exc:
         raise LockFileError(f"无法读取锁文件 {lock_path}: {exc}") from exc
 
+    hash_required = "--require-hashes" in lines
     for line_number, line in enumerate(lines, start=1):
+        if not line.strip() or line.startswith("#") or line in {"--only-binary=:all:", "--require-hashes"}:
+            continue
         match = _ENTRY.fullmatch(line)
         if not match:
             raise LockFileError(f"第 {line_number} 行不是精确的 name==version：{line!r}")
-        name, version = match.groups()
+        if hash_required and not match.group("hashes"):
+            raise LockFileError(f"第 {line_number} 行缺少 SHA-256 内容哈希")
+        name, version = match.group(1), match.group(2)
         canonical_name = _canonical_name(name)
         if canonical_name in names:
             raise LockFileError(f"第 {line_number} 行的分发名重复：{name}")

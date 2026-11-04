@@ -1,3 +1,4 @@
+# Security refresh: official PyPI content verified 2026-11-04.
 # Native interaction JSON Schema validation, Python 3.12 / Linux x86_64.
 # Official PyPI wheels fetched through the existing proxy on 2026-10-02T18:02:19.918981+00:00
 --only-binary=:all:
@@ -13,3 +14,5 @@ rpds-py==0.27.1 \
     --hash=sha256:466bfe65bd932da36ff279ddd92de56b042f2266d752719beb97b08526268ec5
 attrs==26.1.0 \
     --hash=sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309
+typing-extensions==4.16.0 \
+    --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8

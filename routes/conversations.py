@@ -5,7 +5,7 @@ from __future__ import annotations
 import html as html_escape
 import logging
 import uuid
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
@@ -14,6 +14,7 @@ from engine.codex_app_server import AppServerError, AppServerProtocolError
 from engine.conversation_service import conversation_service
 from shared.client_origin import classify_client_origin
 from shared.conversation_defaults import new_defaults
+from shared.permission_choice import PermissionChoiceRequired, pending as permission_choice_pending
 from shared.conversation_catalog import (
     catalog_models, catalog_skills,
 )
@@ -48,6 +49,16 @@ async def quick_conversation(
     redirect = require_auth(request)
     if redirect:
         return redirect
+    account_id = logged_in(request) if hasattr(request, 'cookies') else None
+    try:
+        if permission_choice_pending(account_id):
+            parameters = {key: value for key, value in {
+                'workdir': workdir, 'project_id': project_id, 'prompt': prompt, 'quoted': quoted,
+            }.items() if value}
+            target = '/quick' + ('?' + urlencode(parameters) if parameters else '')
+            return RedirectResponse('/settings/permission-choice?' + urlencode({'return_to': target}), 303)
+    except (OSError, ValueError) as error:
+        return html("无法新建对话", nav() + "<h1>无法新建对话</h1><p class='error'>" + html_escape.escape(str(error)) + "</p><a href='/home'>返回首页</a>")
     try:
         normalized_project = project_id.strip() or None
         if normalized_project:
@@ -58,7 +69,6 @@ async def quick_conversation(
             cwd = str(conversation_cwd(workdir)) if workdir else None
         origin, _evidence, _policy = classify_client_origin(request)
         service = conversation_service()
-        account_id = logged_in(request) if hasattr(request, 'cookies') else None
         defaults = await new_defaults(service, account_id, normalized_project, cwd)
         draft = service.create_draft(
             cwd=cwd, project_id=normalized_project, client_origin=origin,
@@ -66,11 +76,15 @@ async def quick_conversation(
             owner_account_id=(logged_in(request) if hasattr(request, "cookies") else None),
         )
     except (AppServerError, OSError, ValueError) as error:
-        return html(
+        response = html(
             "无法新建对话",
             nav() + "<h1>无法新建对话</h1><p class='error'>"
-            + html_escape.escape(str(error)) + "</p><a href='/home'>返回首页</a>",
+            + html_escape.escape(str(error)) + "</p>"
+            + ("<a href='/settings/permission-choice?return_to=/home'>选择执行权限</a>" if isinstance(error, PermissionChoiceRequired) else "<a href='/home'>返回首页</a>"),
         )
+        if isinstance(error, PermissionChoiceRequired):
+            response.status_code = 409
+        return response
     query = []
     if prompt:
         query.append("prefill=" + quote(prompt))
@@ -308,11 +322,15 @@ async def create_and_start_conversation(
             projects.touch(normalized_project, draft["id"], prompt)
     except (AppServerError, OSError, ValueError) as error:
         back = "/project/" + quote(normalized_project) if normalized_project else "/home"
-        return html(
+        response = html(
             "无法开始对话",
             nav() + "<h1>无法开始对话</h1><p class='error'>"
-            + html_escape.escape(str(error)) + "</p><a href='" + back + "'>返回</a>",
+            + html_escape.escape(str(error)) + "</p>"
+            + ("<a href='/settings/permission-choice?return_to=/home'>选择执行权限</a>" if isinstance(error, PermissionChoiceRequired) else "<a href='" + back + "'>返回</a>"),
         )
+        if isinstance(error, PermissionChoiceRequired):
+            response.status_code = 409
+        return response
     if command_state == "rejected":
         audit(request, "conversation_start_rejected", draft["id"])
     elif command_state == "delivery_unknown":

@@ -630,7 +630,8 @@ def install(config: dict, source: Path) -> dict:
     python = stage / '.venv/bin/python'
     pip_env = network.pip_environment(env)
     network_command([str(python), '-I', '-m', 'pip', '--isolated', 'install', '--index-url', 'https://pypi.org/simple',
-        '--disable-pip-version-check', '-r', str(stage / 'source/requirements-core.lock')],
+        '--disable-pip-version-check', '--require-hashes', '--only-binary=:all:',
+        '-r', str(stage / 'source/requirements-core.lock')],
         env=pip_env, timeout=900, mode=config['settings']['network_mode'],
         phase='依赖下载', code='dependency_download_failed')
     command([str(python), '-I', str(stage / 'source/scripts/check-core-deps.py')], env=env)

@@ -16,7 +16,7 @@ GROUPS = {
     "history": ("history_live", "history_order", "history_search", "history_title_wrap",
                 "conversation_history_paging"),
     "files": ("file_confirmation", "file_listing", "message_attachments", "project_upload_settings"),
-    "settings": ("settings_center", "model_picker_scroll"),
+    "settings": ("settings_center", "model_picker_scroll", "permission_choice"),
     "native": ("conversation_async_questions", "conversation_questions", "native_interactions",
                "plan_context_review", "plan_goal_actions"),
     "security": ("request_origin", "admin_pwa"),
@@ -24,8 +24,8 @@ GROUPS = {
     "automation": ("automations",),
 }
 ALL_GROUPS = tuple(GROUPS)
-OPENSSL_CHECKS = {"request_origin", "admin_pwa", "settings_center", "automations"}
-NGINX_CHECKS = {"settings_center", "automations"}
+OPENSSL_CHECKS = {"request_origin", "admin_pwa", "settings_center", "permission_choice", "automations"}
+NGINX_CHECKS = {"settings_center", "permission_choice", "automations"}
 
 
 def script_for(check: str) -> Path:

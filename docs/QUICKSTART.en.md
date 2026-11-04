@@ -29,7 +29,7 @@ Once installed, you can send tasks from your phone, have your own computer perfo
 
 ## 4. Run your first task
 
-9. In the phone workbench, create an empty test project, then create a conversation and check the selected model and permissions. Send the following text; you do not need to upload material first:
+9. Before the first new conversation, explicitly choose Read-only, Workspace write (recommended), or Full Access. This sets only future-conversation defaults and remains bounded by the operating system and native approval flow. Then create an empty test project and conversation and check the selected model and permission. Send the following text; you do not need to upload material first:
 
 ```text
 Create only one file named “first-use.txt” with the content “This is my first result.” Deliver the file in this conversation and provide a clickable download link; do not only reply with the file path. Do not modify any other files.

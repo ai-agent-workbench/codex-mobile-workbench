@@ -132,3 +132,20 @@ SENSITIVE_PATHS = _configured_paths("CODEX_WEB_FILE_GUARDED_PATHS", (
 NEW_CONVERSATION_MODEL = "gpt-6-sol"
 NEW_CONVERSATION_REASONING = "high"
 NEW_CONVERSATION_PERMISSION = "danger-full-access"
+
+
+def _permission_choice_required() -> bool:
+    """Read the managed-instance enrollment contract without a permissive fallback.
+
+    An absent flag is the pre-enrollment deployment contract.  Managed
+    profiles always write an explicit value, so a malformed supplied value
+    must stop startup rather than silently recovering the legacy Full Access
+    default.
+    """
+    value = os.environ.get("CODEX_WEB_PERMISSION_CHOICE_REQUIRED", "0")
+    if value not in {"0", "1"}:
+        raise RuntimeError("CODEX_WEB_PERMISSION_CHOICE_REQUIRED must be 0 or 1")
+    return value == "1"
+
+
+PERMISSION_CHOICE_REQUIRED = _permission_choice_required()

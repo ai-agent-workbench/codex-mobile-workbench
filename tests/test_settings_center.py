@@ -11,7 +11,7 @@ from unittest import mock
 
 from itsdangerous import URLSafeTimedSerializer
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import Response, RedirectResponse
 
 import projects
 from engine.conversation_runtime import ConversationRuntime
@@ -19,6 +19,7 @@ from engine.conversation_service import ConversationService
 from engine.conversation_store import ConversationStore
 from routes import settings_center as api, conversations, conversation_api, projects as project_routes
 from shared import conversation_defaults, project_rules
+from shared.permission_choice import PermissionChoiceRequired
 from shared.conversation_artifacts import ConversationArtifactService
 from shared.workbench_settings import SettingsConflict, SettingsStore
 from tests.test_conversation_runtime import FakeFactory
@@ -52,6 +53,7 @@ class SettingsCenterTests(unittest.IsolatedAsyncioTestCase):
         for target,value in [
             ('projects.ROOT',self.root/'projects'),('shared.project_rules.STATE',self.root/'state'),
             ('routes.settings_center.settings_store',lambda:self.store),('shared.conversation_defaults.settings_store',lambda:self.store),
+            ('shared.permission_choice.settings_store',lambda:self.store),
             ('routes.settings_center.require_auth',lambda _:None),('routes.settings_center.logged_in',lambda _:'account'),
             ('routes.settings_center.conversation_service',lambda:self.service),('routes.settings_center.audit',mock.Mock()),
             ('routes.settings_center.confirmation_signer',lambda:URLSafeTimedSerializer('test-only-secret')),
@@ -228,6 +230,116 @@ class SettingsCenterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await conversation_defaults.new_defaults(self.service,'mode-account'))['collaboration_mode'],'plan')
         self.service.catalog.side_effect=OSError('offline')
         with self.assertRaises(ValueError):await conversation_defaults.new_defaults(self.service,'account','fixture')
+
+    async def test_first_permission_choice_needs_explicit_selection_and_conflict_can_retry(self):
+        with mock.patch('shared.permission_choice.PERMISSION_CHOICE_REQUIRED', True):
+            with self.assertRaises(PermissionChoiceRequired):
+                await conversation_defaults.new_defaults(self.service, 'account', explicit={'permission':'danger-full-access'})
+            # No catalog call is needed to make the first selection, including
+            # when the catalog is offline.
+            self.service.catalog.side_effect=OSError('offline')
+            self.store.save_account('account', 0, {'personal':'concurrent ordinary save'})
+            stale=await api.save_permission_choice(request({'permission':'workspace-write','revision':0,'return_to':'https://evil.test'}))
+            self.assertEqual(stale.status_code,409)
+            conflict=json.loads(stale.body)
+            self.assertEqual(conflict['code'],'conflict')
+            self.assertEqual(conflict['revision'],1)
+            completed=await api.save_permission_choice(request({'permission':'workspace-write','revision':conflict['revision'],'return_to':'/quick'}))
+            self.assertEqual(completed.status_code,200)
+            self.assertEqual(json.loads(completed.body)['redirect'],'/quick')
+            self.assertTrue(self.store.permission_choice_completed('account'))
+            self.assertEqual(self.store.resolve('account')['values']['permission'],'workspace-write')
+            self.service.catalog.assert_not_called()
+            # Completion unlocks the normal defaults resolver and a stale
+            # request's explicit Full Access never became its selection.
+            values=await conversation_defaults.new_defaults(self.service,'account')
+            self.assertEqual(values['permission'],'workspace-write')
+            self.store.save_project('account','fixture',0,{'permission':'read-only'})
+            project_values=await conversation_defaults.new_defaults(self.service,'account','fixture',str(self.project))
+            self.assertEqual(project_values['permission'],'read-only')
+
+    async def test_api_draft_returns_actionable_409_before_persisting(self):
+        service=mock.MagicMock()
+        with mock.patch.object(conversation_api,'_auth',return_value=None), \
+             mock.patch.object(conversation_api,'logged_in',return_value='account'), \
+             mock.patch.object(conversation_api,'new_defaults',side_effect=PermissionChoiceRequired()), \
+             mock.patch.object(conversation_api,'conversation_service',return_value=service):
+            result=await conversation_api.create_conversation_draft(
+                request(), project_id='', model='fixture', effort=None, permission=None,
+                service_tier=None, collaboration_mode=None, completion_notification=None,
+            )
+        self.assertEqual(result.status_code,409)
+        body=json.loads(result.body)
+        self.assertEqual(body['code'],'permission_choice_required')
+        self.assertIn('/settings/permission-choice',body['permission_choice_url'])
+        service.create_draft.assert_not_called()
+
+    def test_choice_return_targets_reject_browser_network_paths_and_keep_encoded_queries(self):
+        from urllib.parse import urlencode
+        for unsafe in ('//example.invalid', '///example.invalid', '////example.invalid',
+                       ' ///example.invalid', '/\\example.invalid', '/%2fexample.invalid',
+                       'https://example.invalid', '/home#fragment', '/a/../home'):
+            with self.subTest(unsafe=unsafe):
+                self.assertEqual(api._choice_return_to(unsafe), '/home')
+        target = '/quick?' + urlencode({'project_id': 'fixture', 'workdir': '/tmp/中文 目录',
+                                        'prompt': '百分比 50% & 反斜杠 \\n', 'quoted': '1'})
+        self.assertEqual(api._choice_return_to(target), target)
+
+    def test_choice_html_entry_preserves_expired_session_login_redirect(self):
+        redirect = RedirectResponse('/login', 303)
+        with mock.patch.object(api, 'require_auth', return_value=redirect), \
+             mock.patch.object(api, 'logged_in') as account:
+            self.assertIs(api.permission_choice_page(request()), redirect)
+            account.assert_not_called()
+
+    async def test_pending_quick_retains_all_context_for_the_same_entry(self):
+        from urllib.parse import parse_qs, urlsplit
+        parameters = {'project_id': 'fixture', 'workdir': '/tmp/中文 目录',
+                      'prompt': '请保留 50% & 完整上下文', 'quoted': '1'}
+        with mock.patch.object(conversations, 'require_auth', return_value=None), \
+             mock.patch.object(conversations, 'logged_in', return_value='account'), \
+             mock.patch('shared.permission_choice.PERMISSION_CHOICE_REQUIRED', True), \
+             mock.patch.object(conversations, 'conversation_service') as service:
+            response = await conversations.quick_conversation(request(), **parameters)
+        target = parse_qs(urlsplit(response.headers['location']).query)['return_to'][0]
+        self.assertEqual(api._choice_return_to(target), target)
+        self.assertEqual(urlsplit(target).path, '/quick')
+        self.assertEqual({k: v[0] for k, v in parse_qs(urlsplit(target).query).items()}, parameters)
+        service.assert_not_called()
+
+    async def test_choice_rejects_unauthorized_origin_and_missing_selection_without_state(self):
+        with mock.patch('shared.permission_choice.PERMISSION_CHOICE_REQUIRED', True):
+            for data, origin in (({'revision': 0}, 'https://fixture.test'),
+                                 ({'revision': 0, 'permission': 'read-only'}, 'https://evil.test')):
+                response = await api.save_permission_choice(request(data, origin=origin))
+                self.assertEqual(response.status_code, 400)
+                self.assertFalse(self.store.path.exists())
+            with mock.patch.object(api, 'require_auth', return_value=Response(status_code=403)):
+                response = await api.save_permission_choice(request({'revision': 0, 'permission': 'read-only'}))
+                self.assertEqual(response.status_code, 403)
+            self.assertFalse(self.store.path.exists())
+
+    async def test_enrollment_blocks_new_drafts_not_existing_conversations(self):
+        store = ConversationStore(self.root / 'isolated-native.sqlite3')
+        artifacts = ConversationArtifactService(store, self.root / 'isolated-artifacts')
+        runtime = ConversationRuntime(store, artifacts, FakeFactory())
+        service = ConversationService(store, artifacts, runtime)
+        try:
+            with mock.patch('shared.permission_choice.PERMISSION_CHOICE_REQUIRED', False):
+                old = service.create_draft(cwd=str(self.project), permission='danger-full-access', owner_account_id='account')
+            with mock.patch('shared.permission_choice.PERMISSION_CHOICE_REQUIRED', True):
+                for owner in ('account', None):
+                    with self.assertRaises(PermissionChoiceRequired):
+                        service.create_draft(cwd=str(self.project), permission='read-only', owner_account_id=owner)
+                self.assertEqual(service.public_snapshot(old['id'])['conversation']['settings']['permission'], 'danger-full-access')
+                self.store.complete_permission_choice('account', 0, 'read-only')
+                self.assertEqual(service.public_snapshot(old['id'])['conversation']['settings']['permission'], 'danger-full-access')
+                values = await conversation_defaults.new_defaults(self.service, 'account')
+                created = service.create_draft(cwd=str(self.project), owner_account_id='account', **values)
+                self.assertEqual(created['settings']['permission'], 'read-only')
+        finally:
+            await runtime.close()
+            store.close()
 
     async def test_snapshot_personal_skills_queue_and_explicit_empty(self):
         store=ConversationStore(self.root/'native.sqlite3')

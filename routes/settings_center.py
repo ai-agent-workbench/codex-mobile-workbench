@@ -8,10 +8,11 @@ import shutil
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from shared.diagnostics import record_exception
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from itsdangerous import BadSignature
 
 import projects
@@ -20,6 +21,8 @@ from engine.conversation_service import conversation_service
 from shared.config import APP_ROOT, CODEX_APP_SERVER_SOCKET, STATE
 from shared.conversation_catalog import catalog_models, new_conversation_model
 from shared.conversation_defaults import validate_catalog_defaults
+from shared.html_lib import html, templates
+from shared.permission_choice import pending as permission_choice_pending
 from shared.project_rules import read_rule, preview_rule, write_rule
 from shared.security import audit, confirmation_signer, logged_in, require_auth
 from shared.request_origin import require_same_https_origin
@@ -35,6 +38,26 @@ BUILD = hashlib.sha256(Path(__file__).read_bytes() + (APP_ROOT / 'app.py').read_
 
 def reply(value, status=200):
     return JSONResponse(value, status_code=status, headers=HEADERS)
+
+
+def _choice_return_to(value: object) -> str:
+    """Keep local paths local while preserving encoded quick-start query values."""
+    if not isinstance(value, str) or not value or len(value) > 64 * 1024:
+        return '/home'
+    # urlsplit normalizes ///host into /host, whereas browsers treat the raw
+    # spelling as a network-path URL. Validate the raw path before parsing.
+    raw_path = value.partition('?')[0]
+    if (not raw_path.startswith('/') or raw_path.startswith('//')
+            or '\\' in raw_path or '%' in raw_path or any(ord(char) < 32 for char in value)):
+        return '/home'
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return '/home'
+    if (parsed.scheme or parsed.netloc or parsed.fragment or not parsed.path.startswith('/')
+            or parsed.path.startswith('//') or any(part == '..' for part in parsed.path.split('/'))):
+        return '/home'
+    return value
 
 
 def auth(request):
@@ -77,6 +100,61 @@ def failed(error):
     if isinstance(error, (OSError, sqlite3.Error, AppServerError, json.JSONDecodeError, LookupError, TypeError, UnicodeError)):
         return reply({'error': '暂时无法读取或保存；未报告成功，请保留输入后重试。'}, 503)
     return reply({'error': str(error)}, 400)
+
+
+@router.get('/settings/permission-choice')
+def permission_choice_page(request: Request, return_to: str = ''):
+    # This is an HTML entry: preserve normal setup/login redirects instead of
+    # converting an expired session into an API-only JSON response.
+    denied = require_auth(request)
+    if denied is not None:
+        return denied
+    account_id = logged_in(request)
+    if not account_id:
+        return reply({'error': '请重新登录。'}, 401)
+    target = _choice_return_to(return_to)
+    try:
+        if not permission_choice_pending(account_id):
+            return RedirectResponse(target, 303)
+        revision = settings_store().read_account(account_id)['revision']
+        content = templates.get_template('permission_choice.html').render(
+            return_to=target, revision=revision,
+        )
+        response = html('选择执行权限', content)
+        response.headers.update(HEADERS)
+        return response
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        return failed(exc)
+
+
+@router.post('/settings/api/permission-choice')
+async def save_permission_choice(request: Request):
+    account_id, denied = auth(request)
+    if denied is not None:
+        return denied
+    try:
+        data = await body(request)
+        if set(data) - {'permission', 'revision', 'return_to'}:
+            raise ValueError('权限选择请求包含不支持的字段。')
+        target = _choice_return_to(data.get('return_to'))
+        if not permission_choice_pending(account_id):
+            return reply({'completed': True, 'redirect': target})
+        saved = settings_store().complete_permission_choice(
+            account_id, data.get('revision'), data.get('permission')
+        )
+        audit(request, 'permission_choice_completed', data['permission'], account=account_id)
+        return reply({'completed': True, 'redirect': target, 'saved': saved})
+    except SettingsConflict as exc:
+        # Preserve the user's radio selection in the browser, but provide a
+        # fresh CAS token rather than retrying a stale choice or overwriting
+        # the concurrent ordinary settings change.
+        try:
+            revision = settings_store().read_account(account_id)['revision']
+        except (OSError, ValueError, sqlite3.Error):
+            return failed(exc)
+        return reply({'error': str(exc), 'code': 'conflict', 'revision': revision}, 409)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        return failed(exc)
 
 
 async def get_catalog(project_id=''):

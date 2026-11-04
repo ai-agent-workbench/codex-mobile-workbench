@@ -109,9 +109,17 @@ def settings(value: object) -> dict:
 
 
 def validate(value: object, path: Path) -> dict:
-    fields = {'format_version', 'instance_id', 'root', 'account', 'port', 'settings'}
-    if (type(value) is not dict or set(value) != fields
-            or type(value['format_version']) is not int or value['format_version'] != 1):
+    v1_fields = {'format_version', 'instance_id', 'root', 'account', 'port', 'settings'}
+    v2_fields = v1_fields | {'permission_choice_required'}
+    if type(value) is not dict or type(value.get('format_version')) is not int:
+        raise InstanceError('不支持的实例配置，未覆盖或自动重置。', 'invalid_config')
+    if value['format_version'] == 1:
+        if set(value) != v1_fields:
+            raise InstanceError('不支持的实例配置，未覆盖或自动重置。', 'invalid_config')
+    elif value['format_version'] == 2:
+        if set(value) != v2_fields or value['permission_choice_required'] is not True:
+            raise InstanceError('不支持的实例配置，未覆盖或自动重置。', 'invalid_config')
+    else:
         raise InstanceError('不支持的实例配置，未覆盖或自动重置。', 'invalid_config')
     if not isinstance(value['instance_id'], str) or not re.fullmatch('[0-9a-f]{12}', value['instance_id']):
         raise InstanceError('实例标识无效。', 'invalid_config')
@@ -224,7 +232,8 @@ def new_profile(path: Path, payload: dict) -> dict:
     with socket.socket() as listener:
         listener.bind(('127.0.0.1', 0))
         port = listener.getsockname()[1]
-    value = validate({'format_version': 1, 'instance_id': uuid.uuid4().hex[:12],
+    value = validate({'format_version': 2, 'permission_choice_required': True,
+        'instance_id': uuid.uuid4().hex[:12],
         'root': str(root), 'account': payload['account'], 'port': port,
         'settings': {'phone_origin': '', 'automations': False, 'completion_notifications': False,
                      'notification_command': '', 'notification_topic_file': '',
@@ -282,6 +291,7 @@ def environment(config: dict) -> dict[str, str]:
             'CODEX_WEB_DOT_MCP_ENABLED', 'CODEX_WEB_DOT_MCP_REPLY_ENABLED',
             'CODEX_WEB_DOT_EVENTS_OUTBOUND_ENABLED', 'CODEX_WEB_DOT_NTFY_ENABLED')},
         'CODEX_WEB_MANAGED_INSTALL': '1', 'CODEX_WEB_AUTOMATIONS_ENABLED': str(int(options['automations'])),
+        'CODEX_WEB_PERMISSION_CHOICE_REQUIRED': '1' if config['format_version'] == 2 else '0',
         'CODEX_WEB_COMPLETION_NOTIFICATIONS_ENABLED': str(int(options['completion_notifications'])),
         'CODEX_WEB_TASK_NOTIFICATION_COMMAND': options['notification_command'] or str(root / 'unconfigured-task-sender'),
         'CODEX_WEB_TASK_NTFY_TOPIC_FILE': options['notification_topic_file'] or str(root / 'unconfigured-task-topic'),

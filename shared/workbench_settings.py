@@ -20,6 +20,7 @@ from shared.config import (
     NEW_CONVERSATION_MODEL,
     NEW_CONVERSATION_PERMISSION,
     NEW_CONVERSATION_REASONING,
+    PERMISSION_CHOICE_REQUIRED,
     STATE,
 )
 
@@ -53,7 +54,10 @@ def system_defaults() -> dict[str, Any]:
     return {
         "model": NEW_CONVERSATION_MODEL,
         "effort": NEW_CONVERSATION_REASONING,
-        "permission": NEW_CONVERSATION_PERMISSION,
+        # A v2 managed instance still requires an explicit first selection,
+        # but an ordinary later "restore system defaults" must not quietly
+        # restore the legacy Full Access default.
+        "permission": "workspace-write" if PERMISSION_CHOICE_REQUIRED else NEW_CONVERSATION_PERMISSION,
         "service_tier": None,
         "collaboration_mode": "default",
         "followup": "steer",
@@ -281,7 +285,13 @@ class SettingsStore:
         if probe.is_symlink() or not probe.is_dir():
             raise _error("设置目录路径不安全")
         for directory in reversed(missing):
-            directory.mkdir(mode=0o700)
+            try:
+                directory.mkdir(mode=0o700)
+            except FileExistsError:
+                # Another account's first write can create the same private
+                # parent between our probe and mkdir.  The component checks
+                # below still reject a symlink or non-directory.
+                pass
         # Check every relevant component after creation; an attacker cannot
         # redirect the database through a symlinked directory.
         current = parent
@@ -314,7 +324,8 @@ class SettingsStore:
                     defaults_json TEXT NOT NULL,
                     personal TEXT NOT NULL,
                     previous_personal TEXT,
-                    presets_json TEXT NOT NULL
+                    presets_json TEXT NOT NULL,
+                    permission_choice_completed INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE TABLE IF NOT EXISTS workbench_project_settings (
                     account TEXT NOT NULL,
@@ -342,6 +353,11 @@ class SettingsStore:
                 connection.execute("ALTER TABLE workbench_account_settings ADD COLUMN native_modes_json TEXT")
             if "native_modes_revision" not in columns:
                 connection.execute("ALTER TABLE workbench_account_settings ADD COLUMN native_modes_revision INTEGER")
+            if "permission_choice_completed" not in columns:
+                connection.execute(
+                    "ALTER TABLE workbench_account_settings "
+                    "ADD COLUMN permission_choice_completed INTEGER NOT NULL DEFAULT 0"
+                )
             project_columns = {row[1] for row in connection.execute("PRAGMA table_info(workbench_project_settings)")}
             if "native_mode" not in project_columns:
                 connection.execute("ALTER TABLE workbench_project_settings ADD COLUMN native_mode TEXT")
@@ -423,6 +439,88 @@ class SettingsStore:
                 "WHERE account = ? AND project_id = ?", (account, project_id),
             ).fetchone()
             return copy.deepcopy(self._project_snapshot(row))
+        finally:
+            connection.close()
+
+    def permission_choice_completed(self, account: str | None) -> bool:
+        """Return the account's explicit enrollment bit, failing closed.
+
+        Reads intentionally do not migrate an old database.  A v1 database
+        has no column and therefore cannot prove completion.
+        """
+        if account is None:
+            return False
+        account = _identifier(account, label="账号", limit=_ACCOUNT_LIMIT)
+        connection = self._read_connection()
+        if connection is None:
+            return False
+        try:
+            if "permission_choice_completed" not in self._columns(connection, "workbench_account_settings"):
+                return False
+            row = connection.execute(
+                "SELECT permission_choice_completed FROM workbench_account_settings WHERE account = ?", (account,)
+            ).fetchone()
+            if row is None:
+                return False
+            # SQLite permits arbitrary types despite the declaration. Anything
+            # except the exact durable marker is damaged state, not consent.
+            if type(row[0]) is not int or row[0] not in (0, 1):
+                raise _error("首次权限选择状态损坏，未新建对话")
+            return row[0] == 1
+        finally:
+            connection.close()
+
+    def complete_permission_choice(self, account: str, expected_revision: int, permission: str) -> dict[str, Any]:
+        """Atomically persist the first explicit permission selection.
+
+        This is deliberately separate from ordinary settings saves: changing
+        a default is not evidence that the onboarding choice was understood.
+        """
+        account = _identifier(account, label="账号", limit=_ACCOUNT_LIMIT)
+        expected_revision = _revision(expected_revision)
+        permission = _defaults({"permission": permission})["permission"]
+        connection = self._write_connection()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT revision, defaults_json, personal, previous_personal, presets_json, native_modes_json, native_modes_revision, permission_choice_completed "
+                "FROM workbench_account_settings WHERE account = ?", (account,)
+            ).fetchone()
+            current = self._account_snapshot(row)
+            if current["revision"] != expected_revision:
+                raise SettingsConflict("设置已被其他操作更新，请重新选择后重试")
+            completed = row[7] if row is not None else 0
+            if type(completed) is not int or completed not in (0, 1):
+                raise _error("首次权限选择状态损坏，未新建对话")
+            defaults = {**current["defaults"], "permission": permission}
+            next_value = {
+                "revision": current["revision"] + 1,
+                "defaults": defaults,
+                "personal": current["personal"],
+                "previous_personal": current["previous_personal"],
+                "presets": current["presets"],
+            }
+            native_modes = _account_modes(defaults, current["presets"])
+            connection.execute(
+                "INSERT INTO workbench_account_settings "
+                "(account, revision, defaults_json, personal, previous_personal, presets_json, native_modes_json, native_modes_revision, permission_choice_completed) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1) "
+                "ON CONFLICT(account) DO UPDATE SET revision = excluded.revision, defaults_json = excluded.defaults_json, "
+                "personal = excluded.personal, previous_personal = excluded.previous_personal, presets_json = excluded.presets_json, "
+                "native_modes_json = excluded.native_modes_json, native_modes_revision = excluded.native_modes_revision, "
+                "permission_choice_completed = 1",
+                (account, next_value["revision"], _json(_without_mode(defaults)), current["personal"],
+                 current["previous_personal"], _json(_storage_presets(current["presets"])),
+                 None if native_modes is None else _json(native_modes),
+                 next_value["revision"] if native_modes is not None else None),
+            )
+            connection.execute("COMMIT")
+            os.chmod(self.path, 0o600)
+            return copy.deepcopy(next_value)
+        except BaseException:
+            if connection.in_transaction:
+                connection.execute("ROLLBACK")
+            raise
         finally:
             connection.close()
 

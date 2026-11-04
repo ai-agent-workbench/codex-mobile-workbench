@@ -52,6 +52,19 @@ class CoreDependencyCheckerTests(unittest.TestCase):
         self.assertEqual(stderr, "")
         self.assertEqual(lock_path.read_text(encoding="utf-8"), contents)
 
+    def test_accepts_hash_locked_versions_and_comments(self) -> None:
+        contents = "# Supported wheel content lock\n--only-binary=:all:\n--require-hashes\n\nfastapi==0.139.0 --hash=sha256:" + "a" * 64 + "\n"
+        result, _, stderr, path = self.run_checker(contents, {"fastapi": "0.139.0"})
+        self.assertEqual(result, 0, stderr)
+        self.assertEqual(path.read_text(), contents)
+
+    def test_rejects_incomplete_or_unsafe_hash_lock(self) -> None:
+        for row in ("fastapi==0.139.0", "fastapi==0.139.0 --hash=sha256:abc",
+                    "--index-url https://example.invalid", "-r another.lock"):
+            with self.subTest(row=row):
+                result, _, _, _ = self.run_checker("--require-hashes\n" + row + "\n", {})
+                self.assertEqual(result, 2)
+
     def test_reports_missing_distribution(self) -> None:
         result, stdout, stderr, _ = self.run_checker("fastapi==0.139.0\n", {})
 

@@ -1,0 +1,12 @@
+{
+  "name": "codex-mobile-workbench-ci-ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned CI-only dependencies for offline browser checks.",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

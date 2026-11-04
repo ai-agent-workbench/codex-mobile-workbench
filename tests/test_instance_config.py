@@ -39,6 +39,23 @@ class InstanceConfigurationTests(unittest.TestCase):
         self.assertEqual(self.initialize(), first)
         self.assertEqual(marker.read_text(), '用户资料')
 
+    def test_new_profile_is_v2_but_v1_remains_strictly_compatible(self):
+        current = self.initialize()
+        self.assertEqual(current['format_version'], 2)
+        self.assertTrue(current['permission_choice_required'])
+        self.assertEqual(cfg.environment(current)['CODEX_WEB_PERMISSION_CHOICE_REQUIRED'], '1')
+        old = dict(current)
+        old.pop('permission_choice_required')
+        old['format_version'] = 1
+        parsed = cfg.validate(old, self.path)
+        self.assertEqual(parsed['format_version'], 1)
+        self.assertNotIn('permission_choice_required', parsed)
+        self.assertEqual(cfg.environment(parsed)['CODEX_WEB_PERMISSION_CHOICE_REQUIRED'], '0')
+        with self.assertRaises(cfg.InstanceError):
+            cfg.validate({**old, 'permission_choice_required': False}, self.path)
+        with self.assertRaises(cfg.InstanceError):
+            cfg.validate({**current, 'permission_choice_required': False}, self.path)
+
     def test_repeated_prepare_can_complete_missing_owned_directories(self):
         first = self.initialize()
         (self.root / 'workspace/inbox').rmdir()

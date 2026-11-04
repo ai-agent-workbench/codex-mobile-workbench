@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python-tests:
+    name: Python 3.12 full test suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      # Recovery trusts the supported host Python, not setup-python's toolcache.
+      - name: Prepare trusted system Python environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes python3.12-venv
+          /usr/bin/python3.12 -m venv "$RUNNER_TEMP/test-venv"
+      - name: Install locked core dependencies
+        run: '"$RUNNER_TEMP/test-venv/bin/python" -m pip install --disable-pip-version-check --require-hashes -r requirements-core.lock'
+      - name: Run full unit suite
+        run: CODEX_WEB_PYTHON="$RUNNER_TEMP/test-venv/bin/python" bash scripts/run_tests.sh
+
+  ui-offline:
+    name: Offline UI core and settings checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.17.0"
+      - name: Install locked core dependencies
+        run: python -m pip install --disable-pip-version-check --require-hashes -r requirements-core.lock
+      - name: Install required local gateway tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes nginx openssl
+      - name: Install pinned CI browser tools
+        run: npm ci --prefix ci --ignore-scripts
+      - name: Install Chromium for Playwright
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
+        run: npx --prefix ci playwright install --with-deps chromium
+      - name: Run offline UI core and settings groups
+        env:
+          CODEX_WEB_PYTHON: python
+          CODEX_WEB_NODE: node
+          NODE_PATH: ${{ github.workspace }}/ci/node_modules
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
+        run: env -u CODEX_SETTINGS_GATEWAY bash scripts/run_tests.sh ui core settings
+
+  desktop-panel:
+    name: Windows desktop panel self-test
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Build panel and run offline self-test
+        shell: pwsh
+        run: |
+          $outputDirectory = Join-Path $env:RUNNER_TEMP 'desktop-panel'
+          & .\desktop\build-panel.ps1 -OutputDirectory $outputDirectory
+          if ($LASTEXITCODE -ne 0) {
+            throw "build-panel.ps1 退出码：$LASTEXITCODE"
+          }
+          $panel = Join-Path $outputDirectory 'CodexWorkbenchPanel.exe'
+          if (-not (Test-Path -LiteralPath $panel -PathType Leaf)) {
+            throw "未生成 Windows 面板：$panel"
+          }
+          $selfTest = Start-Process -FilePath $panel -ArgumentList '--self-test' -Wait -PassThru
+          if ($selfTest.ExitCode -ne 0) {
+            throw "CodexWorkbenchPanel.exe --self-test 退出码：$($selfTest.ExitCode)"
+          }
+      - name: Upload tested panel executable
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: desktop-panel-exe
+          path: ${{ runner.temp }}/desktop-panel/CodexWorkbenchPanel.exe
+          if-no-files-found: error
+
+  desktop-package:
+    name: Build and verify desktop package
+    needs: desktop-panel
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Download tested panel from this workflow run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: desktop-panel-exe
+          path: ${{ runner.temp }}/desktop-panel
+      - name: Build and verify source package
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          package_directory="$RUNNER_TEMP/codex-mobile-workbench-package"
+          panel="$RUNNER_TEMP/desktop-panel/CodexWorkbenchPanel.exe"
+          python scripts/build-desktop-package.py --panel-exe "$panel" --destination "$package_directory"
+          package_zip="$package_directory.zip"
+          (cd "$RUNNER_TEMP" && sha256sum "$(basename "$package_zip")" > "$(basename "$package_zip").sha256")
+          python scripts/check-ci-package.py \
+            --archive "$package_zip" \
+            --sha256-file "$package_zip.sha256" \
+            --prefix codex-mobile-workbench-package \
+            --source-commit "$GITHUB_SHA"
+      - name: Upload verified package only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: codex-mobile-workbench-package
+          path: |
+            ${{ runner.temp }}/codex-mobile-workbench-package.zip
+            ${{ runner.temp }}/codex-mobile-workbench-package.zip.sha256
+          if-no-files-found: error
+
+  dependency-audit:
+    name: Locked dependency audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Install pinned audit tool
+        run: python -m pip install --disable-pip-version-check pip-audit==2.10.0
+      - name: Audit every existing locked dependency set
+        run: |
+          for lock in \
+            requirements-core.lock \
+            requirements-native-interactions.lock \
+            requirements-passkey.lock \
+            requirements-webpush-build.lock \
+            requirements-webpush.lock; do
+            pip-audit --requirement "$lock" --strict --progress-spinner off
+          done

@@ -411,6 +411,8 @@ class IsolatedRecoveryTests(unittest.TestCase):
             target = self.home / 'restored'
             result = recovery.restore(self.config, {'backup':captured['backup'],'destination':str(target)})
         self.assertFalse(result['activated'])
+        self.assertEqual(cfg.read(target / 'instance.json')['format_version'], 2)
+        self.assertTrue(cfg.read(target / 'instance.json')['permission_choice_required'])
         self.assertEqual((target / 'workspace/projects/project/keep.txt').read_text(), '用户资料')
         self.assertTrue((target / 'workspace/projects/project/run.sh').stat().st_mode & 0o100)
         self.assertFalse(any((target / 'native-home').iterdir()))
@@ -438,6 +440,39 @@ class IsolatedRecoveryTests(unittest.TestCase):
             restored_store.close()
         with self.assertRaises(cfg.InstanceError):
             recovery.restore(self.config, {'backup':captured['backup'],'destination':str(target)})
+
+    def test_restored_v2_keeps_the_explicit_account_choice(self):
+        from shared.workbench_settings import SettingsStore
+        self.prepare()
+        settings = SettingsStore(self.root / 'state/workbench-settings.sqlite3')
+        settings.complete_permission_choice('fixture-owner', 0, 'read-only')
+        with mock.patch.object(recovery, 'unit_status', return_value='inactive'):
+            captured = recovery.backup(self.config)
+            target = self.home / 'restored-enrolled'
+            recovery.restore(None, {'backup': captured['backup'], 'destination': str(target)})
+        restored = cfg.read(target / 'instance.json')
+        self.assertEqual(cfg.environment(restored)['CODEX_WEB_PERMISSION_CHOICE_REQUIRED'], '1')
+        copied = SettingsStore(target / 'state/workbench-settings.sqlite3')
+        self.assertTrue(copied.permission_choice_completed('fixture-owner'))
+        self.assertEqual(copied.resolve('fixture-owner')['values']['permission'], 'read-only')
+        self.assertTrue(settings.permission_choice_completed('fixture-owner'))
+
+    def test_restore_v1_profile_keeps_v1_permission_semantics(self):
+        self.prepare()
+        with mock.patch.object(recovery, 'unit_status', return_value='inactive'):
+            captured = recovery.backup(self.config)
+            manifest = Path(captured['backup']) / 'backup.json'
+            value = json.loads(manifest.read_text())
+            value['profile'].pop('permission_choice_required')
+            value['profile']['format_version'] = 1
+            manifest.write_text(json.dumps(value))
+            manifest.chmod(0o600)
+            target = self.home / 'restored-v1-profile'
+            recovery.restore(None, {'backup': captured['backup'], 'destination': str(target)})
+        restored = cfg.read(target / 'instance.json')
+        self.assertEqual(restored['format_version'], 1)
+        self.assertNotIn('permission_choice_required', restored)
+        self.assertEqual(cfg.environment(restored)['CODEX_WEB_PERMISSION_CHOICE_REQUIRED'], '0')
 
     def test_restored_two_version_snapshot_can_rollback_and_be_backed_up_again(self):
         releases, installed = self.prepare()

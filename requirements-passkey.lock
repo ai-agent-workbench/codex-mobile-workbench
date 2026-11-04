@@ -1,3 +1,4 @@
+# Security refresh: official PyPI content verified 2026-11-04.
 # Optional Passkey runtime for Python 3.12 / Linux x86_64.
 # Install only during the separately authorised candidate-entry maintenance.
 # Generated from the official PyPI index on 2026-08-20 and verified through
@@ -7,8 +8,8 @@
 
 webauthn==3.0.0 \
     --hash=sha256:b5d0c02b6efa16be683f8a75abd2073f5e59a15f42623cc22c31f27600259e64
-pyasn1==0.6.4 \
-    --hash=sha256:deda9277cfd454080ec40b207fb6df82206a3a2688735233cdcd8d3d565f088b
+pyasn1==0.6.5 \
+    --hash=sha256:4017b0fce125096b8573b39c989fdb1a4b19cf761e683398184550fea0e66587
 pyasn1-modules==0.4.2 \
     --hash=sha256:29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a
 cbor2==6.1.4 \

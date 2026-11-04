@@ -280,6 +280,11 @@ class ConversationService:
         owner_account_id: str | None = None,
         web_preferences: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        # Route admission uses new_defaults.  Retain this defensive boundary
+        # for internal callers so an owner-less draft cannot bypass v2's
+        # account-scoped first-use choice.
+        from shared.permission_choice import require_completed
+        require_completed(owner_account_id)
         settings = {
             "model": model or None,
             "effort": effort or None,

@@ -6,6 +6,7 @@ import sqlite3
 
 from engine.codex_app_server import AppServerError
 from shared.conversation_catalog import new_conversation_model
+from shared.permission_choice import require_completed
 from shared.workbench_settings import settings_store
 
 
@@ -27,6 +28,10 @@ def validate_catalog_defaults(values, catalog, *, skills=True):
 
 
 async def new_defaults(service, account, project_id=None, cwd=None, explicit=None):
+    # This admission happens before catalog work and before any caller can
+    # create a draft directory/row.  An explicit permission in a request is
+    # not an explicit first-use choice.
+    require_completed(account)
     try:
         resolved = settings_store().resolve(account, project_id)
     except (OSError, sqlite3.Error) as exc:

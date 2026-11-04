@@ -1,0 +1,26 @@
+<section class="permission-choice-page" data-permission-choice data-revision="{{ revision }}" data-return-to="{{ return_to | e }}">
+  <p class="permission-choice-kicker">首次设置</p>
+  <h1>选择新对话的执行权限</h1>
+  <p class="permission-choice-intro">此选择仅决定今后新建对话的默认权限。已有对话不会改变，之后可在设置中调整。</p>
+  <form id="permission-choice-form" novalidate>
+    <fieldset>
+      <legend>请选择一项</legend>
+      <label class="permission-choice-option">
+        <input type="radio" name="permission" value="read-only">
+        <span><b>只读</b><small>以查看和分析为主；写入、命令和联网是否可用仍由原生配置决定。</small></span>
+      </label>
+      <label class="permission-choice-option recommended">
+        <input type="radio" name="permission" value="workspace-write">
+        <span><b>工作区可写 <em>推荐</em></b><small>可在当前工作区创建和修改文件，适合多数日常任务。</small></span>
+      </label>
+      <label class="permission-choice-option">
+        <input type="radio" name="permission" value="danger-full-access">
+        <span><b>完全访问</b><small>可能访问工作区外可访问的文件、执行命令或联网；上限是运行服务账号的操作系统权限，并不等于管理员。</small></span>
+      </label>
+    </fieldset>
+    <p class="permission-choice-boundary">所选模式、原生 Codex 配置和运行服务账号的操作系统权限共同决定实际边界；此页面不会额外授予系统权限。</p>
+    <p id="permission-choice-error" class="error" role="alert" hidden></p>
+    <button id="permission-choice-save" type="submit">保存并继续</button>
+  </form>
+</section>
+<script src="{{ static_url('/static/permission-choice.js') }}" defer></script>

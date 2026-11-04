@@ -17,6 +17,7 @@ from shared.conversation_pagination import ConversationPageCursorError
 from shared.security import audit, logged_in, require_auth
 from engine.conversation_search import ConversationSearchQueryError
 from shared.history_search import initial_search, search_cards, search_controls
+from shared.permission_choice import pending as permission_choice_pending
 from routes.dot_conversations import dot_available
 
 
@@ -38,6 +39,14 @@ def home(request: Request):
     import projects
 
     account_id = logged_in(request) if request is not None else None
+    try:
+        if permission_choice_pending(account_id):
+            return RedirectResponse('/settings/permission-choice?return_to=/home', 303)
+    except (OSError, ValueError):
+        return html(
+            "无法读取权限设置",
+            nav() + "<h1>无法读取权限设置</h1><p class='error'>首次权限选择状态暂不可读；未新建对话，请稍后重试。</p>",
+        )
     conversations = conversation_service().list_public(
         limit=8,
         account_id=account_id,

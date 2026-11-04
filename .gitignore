@@ -61,3 +61,6 @@ id_ed25519.pub
 Thumbs.db
 .idea/
 .vscode/
+
+# CI-only Node dependencies
+ci/node_modules/

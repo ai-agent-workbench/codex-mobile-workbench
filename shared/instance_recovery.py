@@ -153,6 +153,13 @@ def restore(config, payload):
         raise cfg.InstanceError('恢复目标已存在；请选择新目录，未覆盖或删除任何内容。', 'restore_target_exists')
     original = value['profile']
     profile = cfg.new_profile(target / 'instance.json', {'root': str(target), 'account': original['account']})
+    # The target gets a fresh id/port, but its enrollment semantics belong to
+    # the backed-up profile.  A new physical directory must not turn a v1
+    # account into a first-choice account (or vice versa).
+    if original['format_version'] == 1:
+        profile.pop('permission_choice_required')
+        profile['format_version'] = 1
+        profile = cfg.validate(profile, target / 'instance.json')
     # Restore at the FINAL root so rebound attachment identities do not refer
     # to a temporary subtree. Only successful publication proves target ownership.
     # A losing concurrent restore must never write into the winner's directory.

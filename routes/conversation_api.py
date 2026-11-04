@@ -13,6 +13,7 @@ from engine.codex_app_server import AppServerError, AppServerProtocolError
 from engine.conversation_service import conversation_service
 from shared.client_origin import classify_client_origin
 from shared.conversation_defaults import new_defaults
+from shared.permission_choice import PermissionChoiceRequired
 from shared.conversation_export import content_disposition_filename
 from shared.html_lib import templates
 from shared.security import audit, logged_in, require_auth
@@ -89,10 +90,14 @@ def _auth(request: Request, *, json_api: bool = True):
 
 
 def _error(error: Exception, status_code: int = 400) -> JSONResponse:
-    record_exception("conversation_api_error", error, status=status_code)
+    choice_required = isinstance(error, PermissionChoiceRequired)
+    response_status = 409 if choice_required else status_code
+    record_exception("conversation_api_error", error, status=response_status)
     return JSONResponse(
-        {"error": str(error)[:300]},
-        status_code=status_code,
+        ({"error": str(error)[:300], "code": error.code,
+          "permission_choice_url": "/settings/permission-choice?return_to=/home"}
+         if choice_required else {"error": str(error)[:300]}),
+        status_code=response_status,
         headers=_PRIVATE_HEADERS,
     )
 

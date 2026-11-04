@@ -76,7 +76,7 @@ The Windows panel currently uses Chinese labels. The English guides include thos
 
 ## Current status
 
-This is a **Windows/WSL technical preview**, currently **v0.1.0-preview.2**, using the complete pinned Codex 0.160.0 runtime kit.
+This is a **Windows/WSL technical preview**, currently **v0.1.0-preview.3**, using the complete pinned Codex 0.160.0 runtime kit.
 
 The released setup is **a Windows panel with a WSL backend**, not a Windows-native backend. WSL was originally chosen to reduce rework caused by Windows command quoting, escaping, and path compatibility—not because Codex cannot run on Windows. Further work on a Windows-native release is paused; no installable Windows-native backend is offered. [Support matrix (中文)](docs/SUPPORT_MATRIX.md)
 
@@ -84,7 +84,7 @@ The installer offers three network choices: inherit the existing WSL configurati
 
 The maintainer has checked native sign-in, trusted HTTPS, physical-phone Passkey pairing, a real model task, and a file download on an independent instance. After upgrading to this network-fix preview, sign-in and pairing were retained, and the phone completed another task, obtained the correct file, and returned to the original conversation. Another computer, native Linux, full background/disconnection scenarios, and old public-version data import have not completed this release's real-device checks. See the [support matrix (中文)](docs/SUPPORT_MATRIX.md).
 
-This is a high-privilege personal tool. New conversations currently default to **Full Access**; native tasks can use the runtime account's system permissions. Connect only your own account and devices, not a public multi-user AI service. [Security and private vulnerability reporting (中文)](SECURITY.md) · [Data and costs (中文)](docs/PRIVACY_AND_COSTS.md)
+This is a high-privilege personal tool. A newly installed instance asks each account to explicitly choose **Read-only**, **Workspace write** (recommended), or **Full Access** before its first new conversation; later new conversations use that account default. Native tasks can use the runtime account's system permissions. Connect only your own account and devices, not a public multi-user AI service. [Security and private vulnerability reporting (中文)](SECURITY.md) · [Data and costs (中文)](docs/PRIVACY_AND_COSTS.md)
 
 ## Relationship to the older project
 
@@ -175,7 +175,7 @@ Specific use cases and sanitized reproductions are welcome. No ongoing maintenan
 
 ## 现在到哪一步了
 
-这是 **Windows／WSL 技术预览**，当前版本为 **v0.1.0-preview.2**，固定 Codex 0.160.0 完整原生运行包。
+这是 **Windows／WSL 技术预览**，当前版本为 **v0.1.0-preview.3**，固定 Codex 0.160.0 完整原生运行包。
 
 已发布的是 **Windows 面板＋WSL 后端**，不是 Windows 原生后端。当初选择 WSL，是为了减少 Windows 命令引号、转义及路径兼容问题造成的返工；这是当时的工程取舍，不是 Windows 不能运行 Codex。Windows 原生版后续开发暂缓，尚未提供可安装的原生后端，见 [支持矩阵](docs/SUPPORT_MATRIX.md)。
 
@@ -183,7 +183,7 @@ Specific use cases and sanitized reproductions are welcome. No ongoing maintenan
 
 维护者已经验证独立实例的原生登录、可信 HTTPS、实体手机 Passkey 绑定、真实模型任务和文件下载；本次联网修复版升级后保留登录与绑定，实体手机再次完成任务、取得正确文件并返回原对话。另一台电脑、原生 Linux、完整切后台／断网场景和旧公开版数据导入，尚未完成本次实机验收。详见 [支持矩阵](docs/SUPPORT_MATRIX.md)。
 
-这是个人高权限工具：当前新对话默认 **Full Access**，原生任务可使用运行账户的系统权限。只连接自己的账号和设备；不要把它当作多人公共 AI 服务。[安全边界与私密漏洞报告](SECURITY.md) · [数据与费用](docs/PRIVACY_AND_COSTS.md)
+这是个人高权限工具：新安装实例的每个账号在首次新建对话前，须明确选择 **只读**、**工作区可写**（推荐）或 **完全访问**；之后的新对话使用该账号默认值。原生任务可使用运行账户的系统权限。只连接自己的账号和设备；不要把它当作多人公共 AI 服务。[安全边界与私密漏洞报告](SECURITY.md) · [数据与费用](docs/PRIVACY_AND_COSTS.md)
 
 ## 和旧项目是什么关系
 
