@@ -9,6 +9,8 @@ const net = require('net');
 const cp = require('child_process');
 const readline = require('readline');
 const crypto = require('crypto');
+// Match the production user units, independently of the CI shell's umask.
+process.umask(0o077);
 const root = path.resolve(__dirname, '..');
 const python = process.env.CODEX_WEB_PYTHON || path.join(root, '.venv/bin/python');
 const temporary = fs.mkdtempSync(path.join(os.homedir(), '.recovery-drill-'));
@@ -17,7 +19,7 @@ const draft = '恢复后必须保留的合成草稿';
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 const expected = digest('recovery-drill-artifact-v1\n');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-let driver, native, web, browser, context;
+let driver, native, web, browser, context, command;
 const children = [];
 function spawn(file, args) {
   const child = cp.spawn(python, [path.join(__dirname, 'fixtures', file), ...args],
@@ -51,14 +53,14 @@ function controller(child) {
   lines.on('line', line => {
     if (!pending) return;
     const current = pending; pending = null; clearTimeout(current.timer);
-    try { const value = JSON.parse(line); value.ok ? current.resolve(value) : current.reject(Error(value.error)); }
+    try { const value = JSON.parse(line); value.ok ? current.resolve(value) : current.reject(Error([value.operation, value.error, value.code].filter(Boolean).join(': '))); }
     catch (error) { current.reject(error); }
   });
   child.on('exit', () => fail(Error('controller exited')));
   child.on('error', fail);
   return value => new Promise((resolve, reject) => {
     assert(!pending, 'controller operations are serial');
-    pending = {resolve, reject, timer: setTimeout(() => fail(Error('controller timeout')), 30000)};
+    pending = {resolve, reject, timer: setTimeout(() => fail(Error('controller timeout')), value.op === 'shutdown' ? 5000 : 30000)};
     child.stdin.write(JSON.stringify(value) + '\n', error => { if (error) fail(error); });
   });
 }
@@ -127,7 +129,7 @@ async function newContext(origin, storageState) {
 }
 (async () => {
   driver = spawn('recovery_drill_recovery.py', []);
-  const command = controller(driver);
+  command = controller(driver);
   const initial = await command({op: 'init'});
   assert(path.resolve(initial.root).startsWith(temporary + path.sep), 'driver root belongs to this run');
   const port = await freePort(), origin = `https://localhost:${port}`;
@@ -199,10 +201,23 @@ async function newContext(origin, storageState) {
   console.log('recovery_drill=passed offline_lifecycle=true same_root_restart=true new_root_restore=true old_session_denied=true fresh_passkey=true artifact_sha256_before_after=true unknown_commands=2 no_replay=true');
   await context.close(); context = null;
   await stop(web); await stop(native);
-  await command({op: 'shutdown'});
+  await command({op: 'shutdown'}); command = null;
 })().catch(error => { console.error(error.stack); process.exitCode = 1; }).finally(async () => {
   if (context) await context.close();
   if (browser) await browser.close();
+  await stop(web); await stop(native);
+  if (command && driver.exitCode === null && driver.signalCode === null) {
+    try { await command({op: 'shutdown'}); } catch (_) { /* bounded PID cleanup follows */ }
+  }
   for (const child of children.reverse()) await stop(child);
+  // Read-only controller directories are intentional. Only our own stopped
+  // fixture tree is made removable; never follow links outside that tree.
+  function makeRemovable(directory) {
+    const info = fs.lstatSync(directory);
+    if (!info.isDirectory() || info.isSymbolicLink()) return;
+    fs.chmodSync(directory, 0o700);
+    for (const name of fs.readdirSync(directory)) makeRemovable(path.join(directory, name));
+  }
+  makeRemovable(temporary);
   fs.rmSync(temporary, {recursive: true, force: true});
 });

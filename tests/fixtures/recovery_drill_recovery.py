@@ -50,15 +50,22 @@ def backup_restore():
     auth=sqlite3.connect(target/'state/auth.sqlite3'); sessions=auth.execute('SELECT count(*) FROM admin_sessions').fetchone()[0]; revoked=auth.execute('SELECT count(*) FROM passkey_credentials WHERE revoked_at IS NOT NULL').fetchone()[0]; auth.close()
     return {'root':str(target),'source_unchanged':source_unchanged,'native_auth_excluded':native_auth_excluded,'delivery_unknown':unknown,'sessions':sessions,'credentials_revoked':revoked,'commands_replayed':result['restore_summary']['commands_replayed'],'activated':result['restore_summary']['activated']}
 def main():
+    global case
     try:
         for line in sys.stdin:
+            op='decode'
             try:
                 command=json.loads(line); op=command.get('op')
                 if op=='init': emit({'ok':True,**init()})
                 elif op=='backup_restore': emit({'ok':True,**backup_restore()})
-                elif op=='shutdown': emit({'ok':True}); return
+                elif op=='shutdown':
+                    if case is not None:
+                        case.doCleanups(); case = None
+                    emit({'ok':True}); return
                 else: raise ValueError('unknown operation')
-            except Exception as error: emit({'ok':False,'error':type(error).__name__})
+            except Exception as error:
+                emit({'ok':False,'error':type(error).__name__, 'operation':op,
+                      'code':getattr(error,'code','fixture_error')})
     finally:
         if case is not None: case.doCleanups()
 if __name__=='__main__': main()
