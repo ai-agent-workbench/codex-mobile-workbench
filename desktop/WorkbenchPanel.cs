@@ -380,6 +380,9 @@ namespace CodexWorkbenchPanel
         private readonly Label phoneEntryLabel = new Label();
         private readonly Label localAddressLabel = new Label();
         private readonly Label activityLabel = new Label();
+        private readonly TextBox recoveryScopeBox = new TextBox();
+        private readonly Button activityDetailsButton = new Button();
+        private string lastActivity = "";
         private readonly PictureBox qrPicture = new PictureBox();
         private readonly List<Button> guardedButtons = new List<Button>();
         private Button inspectButton;
@@ -415,6 +418,8 @@ namespace CodexWorkbenchPanel
         }
 
         internal int ActivityCount { get { return activityCount; } }
+        internal string ActivityText { get { return lastActivity; } }
+        internal TextBox RecoveryScopeControl { get { return recoveryScopeBox; } }
         internal int CheckItemCount { get { return checksView.Items.Count; } }
         internal string NetworkHint { get { return networkHintLabel.Text; } }
 
@@ -461,6 +466,27 @@ namespace CodexWorkbenchPanel
                 }
             }
             return false;
+        }
+
+        internal bool RecoveryScopeIsReadable()
+        {
+            // Establish the hidden form's native origin before comparing child
+            // screen rectangles; lazy handle creation otherwise recenters it.
+            IntPtr formHandle = Handle;
+            CreateControlsForDiagnostic(Controls[0]);
+            Controls[0].PerformLayout();
+            Rectangle visible = recoveryScopeBox.RectangleToScreen(recoveryScopeBox.ClientRectangle);
+            for (Control parent = recoveryScopeBox.Parent; parent != null; parent = parent.Parent)
+            {
+                if (!parent.RectangleToScreen(parent.ClientRectangle).Contains(visible))
+                {
+                    throw new InvalidOperationException("备份范围被 " + parent.GetType().Name + " 裁切：区域 "
+                        + visible + "；容器 " + parent.RectangleToScreen(parent.ClientRectangle));
+                }
+            }
+            return recoveryScopeBox.Multiline && recoveryScopeBox.ReadOnly && recoveryScopeBox.WordWrap
+                && recoveryScopeBox.ScrollBars == ScrollBars.Vertical
+                && recoveryScopeBox.ClientSize.Height >= recoveryScopeBox.Font.Height * 3;
         }
 
         internal void RenderDiagnostic(string path)
@@ -526,7 +552,7 @@ namespace CodexWorkbenchPanel
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
             layout.RowCount = 3;
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 220));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 280));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             Controls.Add(layout);
@@ -535,10 +561,25 @@ namespace CodexWorkbenchPanel
             layout.SetColumnSpan(layout.GetControlFromPosition(0, 0), 2);
             layout.Controls.Add(BuildChecksGroup(), 0, 1);
             layout.Controls.Add(BuildConfigurationGroup(), 1, 1);
-            activityLabel.AutoSize = true;
+            TableLayoutPanel activityRow = new TableLayoutPanel();
+            activityRow.Dock = DockStyle.Fill;
+            activityRow.AutoSize = true;
+            activityRow.ColumnCount = 2;
+            activityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            activityRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            activityLabel.AutoSize = false;
+            activityLabel.AutoEllipsis = true;
+            activityLabel.Dock = DockStyle.Fill;
+            activityLabel.MinimumSize = new Size(0, 24);
             activityLabel.Text = "状态：未检查。退出窗口不会停止后台服务。";
-            layout.Controls.Add(activityLabel, 0, 2);
-            layout.SetColumnSpan(activityLabel, 2);
+            activityDetailsButton.AutoSize = true;
+            activityDetailsButton.Text = "查看完整结果";
+            activityDetailsButton.Enabled = false;
+            activityDetailsButton.Click += delegate { ShowActivityDetails(); };
+            activityRow.Controls.Add(activityLabel, 0, 0);
+            activityRow.Controls.Add(activityDetailsButton, 1, 0);
+            layout.Controls.Add(activityRow, 0, 2);
+            layout.SetColumnSpan(activityRow, 2);
 
             Shown += async delegate { await LoadDistributionsAsync(); };
         }
@@ -589,13 +630,15 @@ namespace CodexWorkbenchPanel
             }, false);
             recoveryButtons.Controls.Add(uninstallButton);
             table.Controls.Add(recoveryButtons, 1, 4);
-            Label recoveryScope = new Label();
-            recoveryScope.AutoSize = false;
-            recoveryScope.Dock = DockStyle.Fill;
-            recoveryScope.MaximumSize = new Size(620, 50);
-            recoveryScope.Text = "备份包含：所选实例资料配置、state 白名单（可能含认证资料）、workspace、当前/最多一个回退健康程序、控制器和原生包。排除：原生登录缓存、workspace 外资料、主机实际网关/组网环境和其他历史版本；请妥善保管敏感明文资料。";
-            recoveryScope.AccessibleDescription = "备份范围与敏感性说明。恢复会要求本人重新完成原生登录和手机绑定。";
-            table.Controls.Add(recoveryScope, 1, 5);
+            recoveryScopeBox.Multiline = true;
+            recoveryScopeBox.ReadOnly = true;
+            recoveryScopeBox.WordWrap = true;
+            recoveryScopeBox.ScrollBars = ScrollBars.Vertical;
+            recoveryScopeBox.Dock = DockStyle.Fill;
+            recoveryScopeBox.MinimumSize = new Size(0, 64);
+            recoveryScopeBox.Text = "备份包含：所选实例配置、state 白名单（含认证资料）、workspace、当前及最多一个回退健康程序、控制器和原生包。\r\n不包含：原生登录缓存、workspace 外资料、主机实际网关/组网环境、其他历史版本。\r\n备份是敏感明文资料，请妥善保管；恢复后需本人重新登录并绑定手机。";
+            recoveryScopeBox.AccessibleName = "备份范围与敏感性说明（可滚动）";
+            table.Controls.Add(recoveryScopeBox, 1, 5);
             return group;
         }
 
@@ -899,6 +942,7 @@ namespace CodexWorkbenchPanel
 
         private async Task RefreshAfterWriteAsync(string action, string scope, string successMessage)
         {
+            string completed = successMessage ?? "操作完成。";
             ManagerResponse inspection;
             try
             {
@@ -907,17 +951,58 @@ namespace CodexWorkbenchPanel
             catch (Exception exception)
             {
                 InvalidateInspection();
-                RecordActivity((successMessage ?? "操作完成。") + "；刷新检查未完成：" + exception.Message);
+                ReportCompletedAction(action, completed + "\n刷新检查未完成：" + exception.Message);
                 return;
             }
             if (!inspection.Ok)
             {
                 InvalidateInspection();
-                RecordActivity((successMessage ?? "操作完成。") + "；刷新检查失败：" + inspection.Error);
+                ReportCompletedAction(action, completed + "\n刷新检查失败：" + inspection.Error);
                 return;
             }
             ApplyInspectionForScope(inspection.Data, scope);
-            RecordActivity(successMessage ?? "操作完成，已刷新检查。 ");
+            ReportCompletedAction(action, completed);
+        }
+
+        private void ReportCompletedAction(string action, string message)
+        {
+            RecordActivity(message);
+            if (action == "backup" || action == "restore") { ShowActivityDetails(); }
+        }
+
+        private void ShowActivityDetails()
+        {
+            if (String.IsNullOrEmpty(lastActivity)) { return; }
+            using (Form dialog = CreateActivityDialog(lastActivity)) { dialog.ShowDialog(this); }
+        }
+
+        internal static Form CreateActivityDialog(string message)
+        {
+            Form dialog = new Form();
+            dialog.Text = "完整操作结果与下一步";
+            dialog.StartPosition = FormStartPosition.CenterParent;
+            dialog.ClientSize = new Size(640, 420);
+            dialog.MinimumSize = new Size(420, 260);
+            dialog.Padding = new Padding(12);
+            TextBox content = new TextBox();
+            content.Name = "operation-result";
+            content.Multiline = true;
+            content.ReadOnly = true;
+            content.WordWrap = true;
+            content.ScrollBars = ScrollBars.Vertical;
+            content.Dock = DockStyle.Fill;
+            content.Text = message ?? "";
+            content.AccessibleName = "完整操作结果（可复制和滚动）";
+            Button close = new Button();
+            close.Text = "关闭";
+            close.Dock = DockStyle.Bottom;
+            close.Height = 34;
+            close.DialogResult = DialogResult.OK;
+            dialog.Controls.Add(content);
+            dialog.Controls.Add(close);
+            dialog.AcceptButton = close;
+            dialog.CancelButton = close;
+            return dialog;
         }
 
         internal static string ResultMessage(Dictionary<string, object> data, string fallback)
@@ -1249,10 +1334,12 @@ namespace CodexWorkbenchPanel
             return true;
         }
 
-        private void RecordActivity(string message)
+        internal void RecordActivity(string message)
         {
             activityCount++;
-            activityLabel.Text = "状态：" + message;
+            lastActivity = message ?? "";
+            activityLabel.Text = "状态：" + lastActivity.Replace("\r", " ").Replace("\n", " ");
+            activityDetailsButton.Enabled = !String.IsNullOrEmpty(lastActivity);
         }
 
         private void ApplyInspectionForScope(Dictionary<string, object> data, string scope)
@@ -1653,7 +1740,16 @@ namespace CodexWorkbenchPanel
                 Assert(backupPreview.Ok && WorkbenchPanelForm.BackupSummaryMessage(backupPreview.Data).Contains("恢复点捕获 UTC 时间：2026-11-04T08:09:10Z")
                     && WorkbenchPanelForm.BackupSummaryMessage(backupPreview.Data).Contains("资料校验：校验通过"), "恢复点预检摘要格式");
                 Dictionary<string, object> restoredSummary = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>("{\"restore_summary\":{\"data\":{\"status\":\"verified_and_restored\",\"attachments_rebound\":2,\"external_cwd_not_materialized\":1,\"delivery_unknown_commands\":3},\"software\":{\"status\":\"restored_verified\"}}}");
-                Assert(WorkbenchPanelForm.ResultMessage(restoredSummary, null).Contains("未知投递命令 3") && WorkbenchPanelForm.ResultMessage(restoredSummary, null).Contains("下一步"), "恢复成功摘要在刷新失败前可保留");
+                string restoredMessage = WorkbenchPanelForm.ResultMessage(restoredSummary, null);
+                Assert(restoredMessage.Contains("未知投递命令 3") && restoredMessage.Contains("下一步"), "恢复结果包含未知命令和下一步");
+                string longResult = new string('长', 2000) + "\r\n" + restoredMessage + "\r\n刷新检查失败：合成错误";
+                using (Form details = WorkbenchPanelForm.CreateActivityDialog(longResult))
+                {
+                    TextBox content = details.Controls["operation-result"] as TextBox;
+                    Assert(content != null && content.ReadOnly && content.Multiline && content.ScrollBars == ScrollBars.Vertical,
+                        "完整结果必须只读可滚动，不依赖单行状态栏");
+                    Assert(content.Text == longResult && content.Text.EndsWith("刷新检查失败：合成错误"), "长结果和刷新失败信息不得截断");
+                }
                 fakeRunner.AssertInstanceConfig(instanceRoot, "inspect", "configure", "initialize", "inspect-backup");
                 fakeRunner.AssertManagerUtf8();
                 Assert(ProcessEncodings.Utf8NoBom.GetPreamble().Length == 0, "JSON stdin 不带 UTF-8 BOM");
@@ -1712,6 +1808,12 @@ namespace CodexWorkbenchPanel
                     }
                     form.ApplyInspectionFixture(inspection.Data, distribution, instanceRoot);
                     Assert(form.CheckItemCount >= 4, "真实 JSON checks 未丢失");
+                    form.ClientSize = new Size(760, 620);
+                    Assert(form.RecoveryScopeIsReadable(), "窄窗口备份范围区域完整可见、可滚动");
+                    form.ClientSize = new Size(900, 690);
+                    Assert(form.RecoveryScopeIsReadable(), "默认窗口备份范围区域完整可见、可滚动");
+                    form.RecordActivity(longResult);
+                    Assert(form.ActivityText == longResult, "状态栏省略不丢失完整操作结果");
                     if (!String.IsNullOrEmpty(renderPath))
                     {
                         Dictionary<string, object> settings = inspection.Data["settings"] as Dictionary<string, object>;

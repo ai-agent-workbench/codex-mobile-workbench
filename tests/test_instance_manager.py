@@ -425,8 +425,30 @@ class IsolatedRecoveryTests(unittest.TestCase):
         legacy['format_version'] = 1
         legacy.pop('created_at')
         cfg.write_json(backup / 'backup.json', legacy)
-        verified = recovery.verify(backup)
-        self.assertEqual(recovery.backup_summary(verified, backup)['created_at'], 'unknown')
+        self.assertEqual(recovery.verify(backup)['format_version'], 1)
+        self.assertEqual(recovery.inspect_backup(backup)['created_at'], 'unknown')
+
+    def test_completed_restore_summary_survives_source_backup_relocation(self):
+        self.prepare()
+        with mock.patch.object(recovery, 'unit_status', return_value='inactive'):
+            captured = recovery.backup(self.config)
+        source = Path(captured['backup'])
+        target = self.home / 'restored-before-archive-move'
+        archived = source.with_name(source.name + '-archived')
+        write_json = cfg.write_json
+
+        def archive_after_final_report(path, value, *args, **kwargs):
+            result = write_json(path, value, *args, **kwargs)
+            if Path(path) == target / 'restore-report.json' and 'software_restored' in value:
+                source.rename(archived)
+            return result
+
+        with mock.patch.object(cfg, 'write_json', side_effect=archive_after_final_report):
+            restored = recovery.restore(None, {'backup': str(source), 'destination': str(target)})
+        self.assertTrue(archived.is_dir())
+        self.assertEqual(restored['restore_summary']['backup'], captured['backup_summary'])
+        self.assertEqual((target / 'workspace/projects/project/keep.txt').read_text(), '用户资料')
+        self.assertFalse((target / 'restore-incomplete.json').exists())
 
     def test_v2_backup_rejects_invalid_capture_timestamp(self):
         self.prepare()

@@ -46,9 +46,8 @@ def _created_at(value):
     return value
 
 
-def backup_summary(value, backup_path):
-    """Public, path-free facts derived only after the bundle has been verified."""
-    cohort = data.verify_recovery_bundle(Path(backup_path) / 'data')
+def _backup_summary(value, cohort):
+    """Bounded facts from this operation's already verified manifest, without I/O."""
     files = cohort['files']
     database_count = sum(1 for item in cohort['databases'].values() if item != {'missing': True})
     byte_count = sum(item['size'] for item in files.values())
@@ -68,7 +67,7 @@ def backup_summary(value, backup_path):
     }
 
 
-def _restore_summary(value, report, target, backup_path):
+def _restore_summary(value, report, target, source_summary):
     """Report only bounded post-restore facts; never return report internals or IDs."""
     if (type(report) is not dict or type(report.get('rebound_attachment_ids')) is not list
             or type(report.get('cwd_not_materialized')) is not list
@@ -86,7 +85,7 @@ def _restore_summary(value, report, target, backup_path):
     needs_rebuild = value['_needs_rebuild']
     return {
         'restored_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
-        'backup': backup_summary(value, backup_path),
+        'backup': source_summary,
         'data': {'status': 'verified_and_restored', 'attachments_rebound': len(report['rebound_attachment_ids']),
                  'external_cwd_not_materialized': len(report['cwd_not_materialized']),
                  'delivery_unknown_commands': unknown_count},
@@ -147,8 +146,8 @@ def backup(config, *, legacy_native=False):
         note = '仅备份所选实例资料配置、state 白名单、workspace 和健康程序；不包含原生登录缓存、workspace 外项目、主机实际网关或组网环境及其他历史版本。备份含敏感明文资料，请妥善保管。'
         if legacy:
             note += ' 此迁移恢复点包含旧版不完整单文件原生程序证据；恢复后必须重建当前完整原生包。'
-        verified = verify(destination, allow_rebuild=legacy)
-        return {'backup': str(destination), 'legacy_native': legacy, 'backup_summary': backup_summary(verified, destination), 'note': note}
+        _, summary = _verify_details(destination, allow_rebuild=legacy)
+        return {'backup': str(destination), 'legacy_native': legacy, 'backup_summary': summary, 'note': note}
     except BaseException:
         # Keep failed capture separate and explicit; do not delete user data or
         # present a partial tree as a valid backup.
@@ -158,6 +157,16 @@ def backup(config, *, legacy_native=False):
 
 
 def verify(path, *, allow_rebuild=False):
+    """Keep the existing metadata-only validation contract for callers."""
+    return _verify_details(path, allow_rebuild=allow_rebuild)[0]
+
+
+def inspect_backup(path):
+    """Explicit read-only check; return only bounded, path-free verified facts."""
+    return _verify_details(path, allow_rebuild=True)[1]
+
+
+def _verify_details(path, *, allow_rebuild=False):
     path = cfg.absolute_path(str(path))
     cfg.private_directory(path)
     cfg.private_file(path / 'backup.json', max_size=2*1024*1024)
@@ -217,7 +226,7 @@ def verify(path, *, allow_rebuild=False):
         native.verify(path / 'native', installation['native'])
     if allow_rebuild:
         value = {**value, '_needs_rebuild': needs_rebuild}
-    return value
+    return value, _backup_summary(value, cohort)
 
 
 def restore(config, payload):
@@ -225,7 +234,7 @@ def restore(config, payload):
         raise cfg.InstanceError('恢复需要明确的备份目录和新的独立目录；不会覆盖原实例。', 'invalid_restore_input')
     source = cfg.absolute_path(payload['backup'])
     target = cfg.absolute_path(payload['destination'])
-    value = verify(source, allow_rebuild=True)  # Data validation BEFORE target creation.
+    value, source_summary = _verify_details(source, allow_rebuild=True)  # Validate BEFORE target creation.
     if target.exists():
         raise cfg.InstanceError('恢复目标已存在；请选择新目录，未覆盖或删除任何内容。', 'restore_target_exists')
     original = value['profile']
@@ -313,7 +322,7 @@ def restore(config, payload):
             note = ('已恢复到新目录，未覆盖原实例、未启动或重放；附件副本身份已重新绑定，外部目录和计划上下文仍需核验，原生与手机登录需本人重做。')
             if value['_needs_rebuild']:
                 note += '电脑 Python 环境与备份不同：只恢复了资料，旧程序未复制或运行。请为此新实例点“安装”重建当前软件。'
-            restore_summary = _restore_summary(value, json.loads((target / 'restore-report.json').read_text()), target, source)
+            restore_summary = _restore_summary(value, json.loads((target / 'restore-report.json').read_text()), target, source_summary)
             return {'root': str(target), 'activated': False,
                     'software_restored': not value['_needs_rebuild'], 'rebuild_required': value['_needs_rebuild'],
                     'restore_summary': restore_summary, 'note': note}

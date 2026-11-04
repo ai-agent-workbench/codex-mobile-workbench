@@ -229,10 +229,9 @@ def main(argv: list[str] | None = None) -> int:
                 raise cfg.InstanceError('恢复点检查只接受备份目录。', 'invalid_backup_input')
             # This deliberately neither reads the selected instance configuration
             # nor creates a target. Restore still verifies the source again.
-            from shared.instance_recovery import backup_summary, verify
+            from shared.instance_recovery import inspect_backup
             backup_path = cfg.absolute_path(value['backup'])
-            result = {'backup': value['backup'], 'backup_summary': backup_summary(
-                verify(backup_path, allow_rebuild=True), backup_path)}
+            result = {'backup': value['backup'], 'backup_summary': inspect_backup(backup_path)}
         elif args.action == 'restore':
             # A replacement computer has no installed instance or profile yet.
             # Restore owns its explicitly chosen NEW target atomically and
