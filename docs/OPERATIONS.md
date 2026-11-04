@@ -39,3 +39,17 @@
 先安全停止并核验空闲，再做一致备份，再使用匹配的同包软件安装／启动。核心控制器验证候选，失败时按其已验证回退链处理；回退切换程序，**不会自动撤销数据库变化**。不认识新数据格式的旧版不能盲目启动。
 
 “卸载入口（保留资料）”注销该实例服务与运行入口，保留资料和备份，并保留旧程序；不等于清盘。删除用户资料需明确对象和恢复影响，不把卸载授权扩大为删除外部项目。
+
+### 隔离恢复故障演练（维护检查）
+
+在源码工作树中运行：
+
+```bash
+CODEX_WEB_PYTHON=/path/to/isolated-venv/bin/python \
+NODE_PATH=/path/to/node_modules PLAYWRIGHT_BROWSERS_PATH=/path/to/playwright \
+python3 scripts/run_ui_checks.py recovery
+```
+
+该检查仅创建任务私有临时实例目录、TLS、临时 WebAuthn 资料、回环 TCP 和私有 UDS 子进程；使用同一隔离实例的真实 Passkey 路由、`CodexAppServerClient` 协议连接、生产对话页面/脚本、真实 artifact 发布/下载及 `instance_recovery.backup/restore` API。它先验证同根 Web 进程停止／启动后原页面通过 WebSocket 重连、草稿保留及文件下载，再停止 Web 子进程，对浏览器实际使用的 state/workspace 备份并恢复到新根目录，验证两个未决命令变为未知投递、旧会话与凭据撤销、重新注册后从恢复根目录下载文件并且不会重复 `turn/start`。合成 UDS 服务只实现此演练所需 RPC，绝不调用模型或命令。
+
+边界：这不是实体手机、WSL 整机、生产 systemd/网关或真实 Codex 历史迁移验收；浏览器的后台切换通过 CDP 冻结／恢复生命周期及浏览器离线状态 模拟，不能证明移动操作系统实际挂起行为。临时进程只由检查本身按 PID 终止。

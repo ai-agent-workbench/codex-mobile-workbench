@@ -76,13 +76,15 @@ The Windows panel currently uses Chinese labels. The English guides include thos
 
 ## Current status
 
-This is a **Windows/WSL technical preview**, currently **v0.1.0-preview.3**, using the complete pinned Codex 0.160.0 runtime kit.
+This is a **Windows/WSL technical preview**, currently **v0.1.0-preview.4**, using the complete pinned Codex 0.160.0 runtime kit.
 
 The released setup is **a Windows panel with a WSL backend**, not a Windows-native backend. WSL was originally chosen to reduce rework caused by Windows command quoting, escaping, and path compatibility—not because Codex cannot run on Windows. Further work on a Windows-native release is paused; no installable Windows-native backend is offered. [Support matrix (中文)](docs/SUPPORT_MATRIX.md)
 
 The installer offers three network choices: inherit the existing WSL configuration, connect directly, or specify a proxy. A failed configured proxy does not silently fall back to a direct connection. Earlier release attachments are unchanged; use the files attached to the version you choose. [Network choices and first use](docs/QUICKSTART.en.md) · [Phone access methods](docs/PHONE_ACCESS.en.md)
 
-The maintainer has checked native sign-in, trusted HTTPS, physical-phone Passkey pairing, a real model task, and a file download on an independent instance. After upgrading to this network-fix preview, sign-in and pairing were retained, and the phone completed another task, obtained the correct file, and returned to the original conversation. Another computer, native Linux, full background/disconnection scenarios, and old public-version data import have not completed this release's real-device checks. See the [support matrix (中文)](docs/SUPPORT_MATRIX.md).
+The maintainer has checked native sign-in, trusted HTTPS, physical-phone Passkey pairing, a real model task, and a file download on an independent instance. In the 2026-10-28 preview.2 check, sign-in and pairing were retained, and the phone completed another task, obtained the correct file, and returned to the original conversation. Another computer, native Linux, full background/disconnection scenarios, and old public-version data import have not completed this release's real-device checks. See the [support matrix (中文)](docs/SUPPORT_MATRIX.md).
+
+Preview.4 adds readable backup/restore summaries and an isolated recovery drill in CI. It checks real authentication, Web-process reconnection, file integrity after restoring to a new directory, and no command replay with synthetic data—not a new physical-device or real-model acceptance test.
 
 This is a high-privilege personal tool. A newly installed instance asks each account to explicitly choose **Read-only**, **Workspace write** (recommended), or **Full Access** before its first new conversation; later new conversations use that account default. Native tasks can use the runtime account's system permissions. Connect only your own account and devices, not a public multi-user AI service. [Security and private vulnerability reporting (中文)](SECURITY.md) · [Data and costs (中文)](docs/PRIVACY_AND_COSTS.md)
 
@@ -175,13 +177,15 @@ Specific use cases and sanitized reproductions are welcome. No ongoing maintenan
 
 ## 现在到哪一步了
 
-这是 **Windows／WSL 技术预览**，当前版本为 **v0.1.0-preview.3**，固定 Codex 0.160.0 完整原生运行包。
+这是 **Windows／WSL 技术预览**，当前版本为 **v0.1.0-preview.4**，固定 Codex 0.160.0 完整原生运行包。
 
 已发布的是 **Windows 面板＋WSL 后端**，不是 Windows 原生后端。当初选择 WSL，是为了减少 Windows 命令引号、转义及路径兼容问题造成的返工；这是当时的工程取舍，不是 Windows 不能运行 Codex。Windows 原生版后续开发暂缓，尚未提供可安装的原生后端，见 [支持矩阵](docs/SUPPORT_MATRIX.md)。
 
 本版安装器提供“沿用现有 WSL 配置／明确直连／指定代理”，不再一律要求代理；指定代理失败不会偷偷切换直连。首版附件保持不变，各版本行为以其固定附件为准。[网络选择与首次使用](docs/QUICKSTART.md) · [手机接入路线](docs/PHONE_ACCESS.md)。
 
-维护者已经验证独立实例的原生登录、可信 HTTPS、实体手机 Passkey 绑定、真实模型任务和文件下载；本次联网修复版升级后保留登录与绑定，实体手机再次完成任务、取得正确文件并返回原对话。另一台电脑、原生 Linux、完整切后台／断网场景和旧公开版数据导入，尚未完成本次实机验收。详见 [支持矩阵](docs/SUPPORT_MATRIX.md)。
+维护者已经验证独立实例的原生登录、可信 HTTPS、实体手机 Passkey 绑定、真实模型任务和文件下载；2026-10-28 的 preview.2 升级验收保留登录与绑定，实体手机再次完成任务、取得正确文件并返回原对话。另一台电脑、原生 Linux、完整切后台／断网场景和旧公开版数据导入，尚未完成本次实机验收。详见 [支持矩阵](docs/SUPPORT_MATRIX.md)。
+
+preview.4 增加可读的备份／恢复摘要及公开 CI 隔离演练：用合成数据核验真实认证、Web 进程重启后的重连、新目录恢复后的文件一致性与命令不重发，不冒充新一轮实体设备或真实模型验收。
 
 这是个人高权限工具：新安装实例的每个账号在首次新建对话前，须明确选择 **只读**、**工作区可写**（推荐）或 **完全访问**；之后的新对话使用该账号默认值。原生任务可使用运行账户的系统权限。只连接自己的账号和设备；不要把它当作多人公共 AI 服务。[安全边界与私密漏洞报告](SECURITY.md) · [数据与费用](docs/PRIVACY_AND_COSTS.md)
 

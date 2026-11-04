@@ -10,9 +10,9 @@ commit SHA。
 1. **Python 3.12 full test suite**：在 `ubuntu-24.04` 以
    受信 `/usr/bin/python3.12` 创建独立 venv，以 `requirements-core.lock` 的哈希锁安装依赖，并运行
    `bash scripts/run_tests.sh`。
-2. **Offline UI core and settings checks**：独立安装锁定的 Playwright
+2. **Offline UI core, settings and recovery checks**：同样用受信系统 Python 创建私有 venv，独立安装锁定的 Playwright
    1.62.1（见 [`ci/package-lock.json`](../ci/package-lock.json)）、Chromium、nginx 和
-   OpenSSL，随后运行 `ui core settings`。不设置 `CODEX_SETTINGS_GATEWAY=direct`；缺少
+   OpenSSL，随后运行 `ui core settings recovery`。不设置 `CODEX_SETTINGS_GATEWAY=direct`；缺少
    nginx 或 OpenSSL 会由既有 UI 入口失败，而不会降级为直连。
 3. **Windows desktop panel self-test**：在 `windows-2022` 将 EXE 构建到
    `RUNNER_TEMP`，执行 `CodexWorkbenchPanel.exe --self-test` 并显式检查其退出码。只有
@@ -30,7 +30,7 @@ commit SHA。
 ```bash
 python3 -m unittest tests.test_ci_package -v
 python3 scripts/check-ci-package.py --help
-bash scripts/run_tests.sh ui --dry-run core settings
+bash scripts/run_tests.sh ui --dry-run core settings recovery
 ```
 
 `scripts/check-ci-package.py` 只校验已经生成的 ZIP；不构建、上传或发布。完整打包仍使用

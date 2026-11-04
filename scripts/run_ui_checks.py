@@ -22,9 +22,10 @@ GROUPS = {
     "security": ("request_origin", "admin_pwa"),
     "dot": ("dot_mobile", "dot_presentation", "dot_read_history"),
     "automation": ("automations",),
+    "recovery": ("recovery_drill",),
 }
 ALL_GROUPS = tuple(GROUPS)
-OPENSSL_CHECKS = {"request_origin", "admin_pwa", "settings_center", "permission_choice", "automations"}
+OPENSSL_CHECKS = {"request_origin", "admin_pwa", "settings_center", "permission_choice", "automations", "recovery_drill"}
 NGINX_CHECKS = {"settings_center", "permission_choice", "automations"}
 
 
