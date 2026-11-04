@@ -23,7 +23,7 @@ from shared import instance_network as network
 
 SOURCE = Path(__file__).resolve().parents[1]
 ACTIONS = ('inspect', 'initialize', 'configure', 'install', 'start', 'stop', 'restart',
-           'login', 'authorize-phone', 'backup', 'restore', 'rollback', 'uninstall')
+           'login', 'authorize-phone', 'backup', 'inspect-backup', 'restore', 'rollback', 'uninstall')
 
 
 def revision(config: dict) -> str:
@@ -223,6 +223,16 @@ def main(argv: list[str] | None = None) -> int:
                       'note': '只完成独立实例准备，尚不等于软件安装、账号登录或手机可用。'}
         elif args.action == 'configure':
             result = configure(path, input_object())
+        elif args.action == 'inspect-backup':
+            value = input_object()
+            if type(value) is not dict or set(value) != {'backup'} or not isinstance(value['backup'], str):
+                raise cfg.InstanceError('恢复点检查只接受备份目录。', 'invalid_backup_input')
+            # This deliberately neither reads the selected instance configuration
+            # nor creates a target. Restore still verifies the source again.
+            from shared.instance_recovery import backup_summary, verify
+            backup_path = cfg.absolute_path(value['backup'])
+            result = {'backup': value['backup'], 'backup_summary': backup_summary(
+                verify(backup_path, allow_rebuild=True), backup_path)}
         elif args.action == 'restore':
             # A replacement computer has no installed instance or profile yet.
             # Restore owns its explicitly chosen NEW target atomically and

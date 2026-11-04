@@ -403,6 +403,71 @@ class IsolatedRecoveryTests(unittest.TestCase):
         (self.root / 'native-home/keep-local.txt').write_text('not login data; prove excluded')
         return releases, installed
 
+    def test_backup_v2_summary_and_legacy_v1_validation(self):
+        self.prepare()
+        with mock.patch.object(recovery, 'unit_status', return_value='inactive'):
+            captured = recovery.backup(self.config)
+        backup = Path(captured['backup'])
+        manifest = json.loads((backup / 'backup.json').read_text())
+        self.assertEqual(manifest['format_version'], 2)
+        self.assertRegex(manifest['created_at'], r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')
+        summary = captured['backup_summary']
+        cohort = recovery.data.verify_recovery_bundle(backup / 'data')
+        self.assertEqual(summary['created_at'], manifest['created_at'])
+        self.assertEqual(summary['data']['files'], len(cohort['files']))
+        self.assertEqual(summary['data']['bytes'], sum(item['size'] for item in cohort['files'].values()))
+        self.assertEqual(summary['data']['status'], 'verified')
+        self.assertEqual(summary['software']['status'], 'verified')
+        self.assertIn('认证资料', summary['sensitive_notice'])
+        # New readers retain compatibility with a strictly v1 manifest, whose
+        # capture time is genuinely unavailable rather than guessed from disk.
+        legacy = dict(manifest)
+        legacy['format_version'] = 1
+        legacy.pop('created_at')
+        cfg.write_json(backup / 'backup.json', legacy)
+        verified = recovery.verify(backup)
+        self.assertEqual(recovery.backup_summary(verified, backup)['created_at'], 'unknown')
+
+    def test_v2_backup_rejects_invalid_capture_timestamp(self):
+        self.prepare()
+        with mock.patch.object(recovery, 'unit_status', return_value='inactive'):
+            captured = recovery.backup(self.config)
+        manifest = Path(captured['backup']) / 'backup.json'
+        value = json.loads(manifest.read_text())
+        for invalid in ('2026-99-01T00:00:00Z', '2026-01-01T00:00:00+00:00', 0):
+            broken = dict(value)
+            broken['created_at'] = invalid
+            cfg.write_json(manifest, broken)
+            with self.assertRaises(cfg.InstanceError) as error:
+                recovery.verify(Path(captured['backup']))
+            self.assertEqual(error.exception.code, 'invalid_backup')
+        cfg.write_json(manifest, value)
+
+    def test_inspect_backup_needs_no_selected_instance_or_target_and_rejects_damage(self):
+        self.prepare()
+        with mock.patch.object(recovery, 'unit_status', return_value='inactive'):
+            captured = recovery.backup(self.config)
+        selected = self.home / 'absent-selection/instance.json'
+        output = io.StringIO()
+        raw = json.dumps({'backup': captured['backup']}).encode('utf-8')
+        stdin = io.TextIOWrapper(io.BytesIO(raw), encoding='utf-8')
+        with mock.patch('sys.stdin', stdin), mock.patch('sys.stdout', output), \
+                mock.patch.object(manager, 'user_environment', side_effect=AssertionError('no service query')):
+            self.assertEqual(manager.main(['--config', str(selected), 'inspect-backup']), 0)
+        response = json.loads(output.getvalue())
+        self.assertTrue(response['ok'])
+        self.assertEqual(response['backup_summary']['data']['status'], 'verified')
+        self.assertFalse(selected.parent.exists())
+        damaged = Path(captured['backup']) / 'native/bin/codex'
+        damaged.chmod(0o700)
+        damaged.write_text('damaged')
+        output = io.StringIO()
+        stdin = io.TextIOWrapper(io.BytesIO(raw), encoding='utf-8')
+        with mock.patch('sys.stdin', stdin), mock.patch('sys.stdout', output):
+            self.assertEqual(manager.main(['--config', str(selected), 'inspect-backup']), 2)
+        self.assertFalse(json.loads(output.getvalue())['ok'])
+        self.assertFalse(selected.parent.exists())
+
     def test_stopped_backup_and_isolated_restore_do_not_transfer_sessions_or_replay(self):
         self.prepare()
         original = (self.root / 'state/session_secret').read_bytes()
@@ -411,6 +476,13 @@ class IsolatedRecoveryTests(unittest.TestCase):
             target = self.home / 'restored'
             result = recovery.restore(self.config, {'backup':captured['backup'],'destination':str(target)})
         self.assertFalse(result['activated'])
+        self.assertEqual(result['restore_summary']['data']['attachments_rebound'], 1)
+        self.assertEqual(result['restore_summary']['data']['external_cwd_not_materialized'], 0)
+        # The bundle report does not list queued commands without attachments;
+        # the visible summary must instead use the final restored database.
+        self.assertEqual(result['restore_summary']['data']['delivery_unknown_commands'], 1)
+        self.assertFalse(result['restore_summary']['activated'])
+        self.assertFalse(result['restore_summary']['commands_replayed'])
         self.assertEqual(cfg.read(target / 'instance.json')['format_version'], 2)
         self.assertTrue(cfg.read(target / 'instance.json')['permission_choice_required'])
         self.assertEqual((target / 'workspace/projects/project/keep.txt').read_text(), '用户资料')
@@ -727,6 +799,8 @@ class IsolatedRecoveryTests(unittest.TestCase):
             target = self.home / 'legacy-rebuilt'
             restored = recovery.restore(None, {'backup': captured['backup'], 'destination': str(target)})
         self.assertTrue(restored['rebuild_required'])
+        self.assertEqual(restored['restore_summary']['software']['status'], 'rebuild_required')
+        self.assertEqual(restored['restore_summary']['backup']['data']['status'], 'verified')
         self.assertFalse((target / 'native').exists())
         self.assertFalse((target / 'installed.json').exists())
 
@@ -836,6 +910,7 @@ class IsolatedRecoveryTests(unittest.TestCase):
                 mock.patch.object(recovery,'copy_tree',side_effect=AssertionError('never copy old programs')):
             result=recovery.restore(None,{'backup':str(source),'destination':str(target)})
         self.assertTrue(result['rebuild_required']);self.assertFalse(result['software_restored'])
+        self.assertEqual(result['restore_summary']['software']['status'], 'rebuild_required')
         for name in ('installed.json','controllers','native','state/releases'):
             self.assertFalse((target/name).exists(),name)
         self.assertFalse(any((target/'native-home').iterdir()))

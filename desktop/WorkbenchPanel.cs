@@ -526,7 +526,7 @@ namespace CodexWorkbenchPanel
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
             layout.RowCount = 3;
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 180));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 220));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             Controls.Add(layout);
@@ -549,7 +549,7 @@ namespace CodexWorkbenchPanel
             group.Text = "实例与服务";
             group.Dock = DockStyle.Fill;
             group.AutoSize = false;
-            TableLayoutPanel table = NewTable(2, 5);
+            TableLayoutPanel table = NewTable(2, 6);
             group.Controls.Add(table);
 
             distributionBox.DropDownStyle = ComboBoxStyle.DropDownList;
@@ -589,6 +589,13 @@ namespace CodexWorkbenchPanel
             }, false);
             recoveryButtons.Controls.Add(uninstallButton);
             table.Controls.Add(recoveryButtons, 1, 4);
+            Label recoveryScope = new Label();
+            recoveryScope.AutoSize = false;
+            recoveryScope.Dock = DockStyle.Fill;
+            recoveryScope.MaximumSize = new Size(620, 50);
+            recoveryScope.Text = "备份包含：所选实例资料配置、state 白名单（可能含认证资料）、workspace、当前/最多一个回退健康程序、控制器和原生包。排除：原生登录缓存、workspace 外资料、主机实际网关/组网环境和其他历史版本；请妥善保管敏感明文资料。";
+            recoveryScope.AccessibleDescription = "备份范围与敏感性说明。恢复会要求本人重新完成原生登录和手机绑定。";
+            table.Controls.Add(recoveryScope, 1, 5);
             return group;
         }
 
@@ -892,18 +899,28 @@ namespace CodexWorkbenchPanel
 
         private async Task RefreshAfterWriteAsync(string action, string scope, string successMessage)
         {
-            ManagerResponse inspection = await manager.InvokeAsync(SelectedDistribution(), SelectedRoot(), "inspect", null);
+            ManagerResponse inspection;
+            try
+            {
+                inspection = await manager.InvokeAsync(SelectedDistribution(), SelectedRoot(), "inspect", null);
+            }
+            catch (Exception exception)
+            {
+                InvalidateInspection();
+                RecordActivity((successMessage ?? "操作完成。") + "；刷新检查未完成：" + exception.Message);
+                return;
+            }
             if (!inspection.Ok)
             {
                 InvalidateInspection();
-                RecordActivity("操作完成但刷新检查失败：" + inspection.Error);
+                RecordActivity((successMessage ?? "操作完成。") + "；刷新检查失败：" + inspection.Error);
                 return;
             }
             ApplyInspectionForScope(inspection.Data, scope);
             RecordActivity(successMessage ?? "操作完成，已刷新检查。 ");
         }
 
-        private static string ResultMessage(Dictionary<string, object> data, string fallback)
+        internal static string ResultMessage(Dictionary<string, object> data, string fallback)
         {
             List<string> parts = new List<string>();
             string note = ManagerResponse.GetString(data, "note");
@@ -912,7 +929,71 @@ namespace CodexWorkbenchPanel
             if (!String.IsNullOrEmpty(note)) { parts.Add(note); }
             if (!String.IsNullOrEmpty(root)) { parts.Add("实例：" + root); }
             if (!String.IsNullOrEmpty(backup)) { parts.Add("备份：" + backup); }
+            Dictionary<string, object> backupSummary = data.ContainsKey("backup_summary") ? data["backup_summary"] as Dictionary<string, object> : null;
+            Dictionary<string, object> restoreSummary = data.ContainsKey("restore_summary") ? data["restore_summary"] as Dictionary<string, object> : null;
+            if (backupSummary != null) { parts.Add(BackupSummaryMessage(new Dictionary<string, object> { { "backup_summary", backupSummary } })); }
+            if (restoreSummary != null) { parts.Add(RestoreSummaryMessage(restoreSummary)); }
             return parts.Count == 0 ? (fallback ?? "操作完成，已刷新检查。 ") : String.Join("；", parts.ToArray());
+        }
+
+        internal static string BackupSummaryMessage(Dictionary<string, object> data)
+        {
+            Dictionary<string, object> summary = data.ContainsKey("backup_summary") ? data["backup_summary"] as Dictionary<string, object> : null;
+            if (summary == null)
+            {
+                return "未返回恢复点摘要，校验状态未知。";
+            }
+            Dictionary<string, object> content = summary.ContainsKey("data") ? summary["data"] as Dictionary<string, object> : null;
+            Dictionary<string, object> software = summary.ContainsKey("software") ? summary["software"] as Dictionary<string, object> : null;
+            string captured = ManagerResponse.GetString(summary, "created_at");
+            if (ManagerResponse.GetString(summary, "created_at_kind") == "unknown_legacy_v1")
+            {
+                captured = "旧 v1：未知（原清单未记录时间）";
+            }
+            else if (String.IsNullOrEmpty(captured)) { captured = "未知"; }
+            string dataStatus = RecoveryStatusMessage(ManagerResponse.GetString(content, "status"));
+            string softwareStatus = RecoveryStatusMessage(ManagerResponse.GetString(software, "status"));
+            string scope = "范围：所选实例资料配置、state 白名单（可能含认证资料）和 workspace；当前/最多一个回退健康程序、控制器和原生包。排除原生登录缓存、workspace 外资料、主机实际网关/组网环境和其他历史版本；请妥善保管敏感明文资料。";
+            return "恢复点捕获 UTC 时间：" + captured + "；资料校验：" + dataStatus
+                + "（文件 " + NumberValue(content, "files") + "、数据库 " + NumberValue(content, "databases")
+                + "、字节 " + NumberValue(content, "bytes") + "）；程序：" + softwareStatus
+                + "（版本 " + NumberValue(software, "versions") + "）。" + scope;
+        }
+
+        private static string RestoreSummaryMessage(Dictionary<string, object> summary)
+        {
+            Dictionary<string, object> content = summary.ContainsKey("data") ? summary["data"] as Dictionary<string, object> : null;
+            Dictionary<string, object> software = summary.ContainsKey("software") ? summary["software"] as Dictionary<string, object> : null;
+            Dictionary<string, object> backup = summary.ContainsKey("backup") ? summary["backup"] as Dictionary<string, object> : null;
+            string capture = backup == null ? "" : BackupSummaryMessage(new Dictionary<string, object> { { "backup_summary", backup } }) + "\n";
+            return capture + "恢复完成 UTC 时间：" + ManagerResponse.GetString(summary, "restored_at")
+                + "；恢复结果：资料 " + RecoveryStatusMessage(ManagerResponse.GetString(content, "status")) + "，附件已重绑 "
+                + NumberValue(content, "attachments_rebound") + "，未物化外部 cwd "
+                + NumberValue(content, "external_cwd_not_materialized") + "，未知投递命令 "
+                + NumberValue(content, "delivery_unknown_commands") + "；程序 "
+                + RecoveryStatusMessage(ManagerResponse.GetString(software, "status")) + "。下一步：必要时先安装重建程序，再完成原生登录、配置手机 HTTPS 并绑定手机；检查工程、计划和未知投递，不自动续跑旧任务。";
+        }
+
+        private static string RecoveryStatusMessage(string status)
+        {
+            switch (status)
+            {
+                case "verified": return "校验通过";
+                case "verified_and_restored": return "已校验并恢复";
+                case "restored_verified": return "已校验并恢复";
+                case "rebuild_required": return "需安装重建，不能直接运行旧程序";
+                default: return "未知";
+            }
+        }
+
+        private static string NumberValue(Dictionary<string, object> data, string key)
+        {
+            object value;
+            if (data != null && data.TryGetValue(key, out value) && value != null)
+            {
+                return Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
+            }
+            return "未知";
         }
 
         private async Task RollbackAsync()
@@ -926,10 +1007,50 @@ namespace CodexWorkbenchPanel
         private async Task RestoreAsync()
         {
             Dictionary<string, object> input = PromptRestore();
-            if (input != null)
+            if (input == null)
             {
-                await RunActionAsync("restore", input, null);
+                return;
             }
+            if (String.IsNullOrEmpty(SelectedDistribution()))
+            {
+                RecordActivity("请先选择 WSL 发行版。 ");
+                return;
+            }
+            SetBusy(true);
+            try
+            {
+                Dictionary<string, object> previewInput = new Dictionary<string, object>();
+                previewInput["backup"] = input["backup"];
+                ManagerResponse preview = await manager.InvokeAsync(SelectedDistribution(), SelectedRoot(), "inspect-backup", previewInput);
+                if (!preview.Ok)
+                {
+                    RecordActivity("恢复点检查失败：" + preview.Error);
+                    return;
+                }
+                if (!preview.Data.ContainsKey("backup_summary") || !(preview.Data["backup_summary"] is Dictionary<string, object>))
+                {
+                    RecordActivity("恢复点检查未返回摘要，未开始恢复。 ");
+                    return;
+                }
+                string message = BackupSummaryMessage(preview.Data);
+                DialogResult confirmation = MessageBox.Show(message + "\n\n恢复只会写入所选的新目录，不覆盖、不激活、不启动或重放。是否继续？",
+                    "确认恢复到新目录", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (confirmation != DialogResult.Yes)
+                {
+                    RecordActivity("已检查恢复点，未写入新目录。 ");
+                    return;
+                }
+            }
+            catch (Exception exception)
+            {
+                RecordActivity("恢复点检查未完成：" + exception.Message);
+                return;
+            }
+            finally
+            {
+                SetBusy(false);
+            }
+            await RunActionAsync("restore", input, null);
         }
 
         private Dictionary<string, object> PromptRestore()
@@ -1410,6 +1531,10 @@ namespace CodexWorkbenchPanel
             {
                 return new ProcessOutput { ExitCode = 0, StandardOutput = "{\"ok\":true,\"action\":\"configure\",\"revision\":\"revision-2\"}", StandardError = "" };
             }
+            if (action == "inspect-backup")
+            {
+                return new ProcessOutput { ExitCode = 0, StandardOutput = "{\"ok\":true,\"action\":\"inspect-backup\",\"backup_summary\":{\"created_at\":\"2026-11-04T08:09:10Z\",\"data\":{\"status\":\"verified\",\"files\":7,\"databases\":2,\"bytes\":99},\"software\":{\"status\":\"verified\",\"versions\":1}}}", StandardError = "" };
+            }
             return new ProcessOutput { ExitCode = 0, StandardOutput = "{\"ok\":true,\"action\":\"" + action + "\"}", StandardError = "" };
         }
 
@@ -1522,7 +1647,14 @@ namespace CodexWorkbenchPanel
                 initializeInput["root"] = instanceRoot;
                 initializeInput["account"] = "owner";
                 Assert(client.InvokeAsync(distribution, instanceRoot, "initialize", initializeInput).GetAwaiter().GetResult().Ok, "安装准备调用");
-                fakeRunner.AssertInstanceConfig(instanceRoot, "inspect", "configure", "initialize");
+                Dictionary<string, object> backupInput = new Dictionary<string, object>();
+                backupInput["backup"] = "/home/fixture/backups/one";
+                ManagerResponse backupPreview = client.InvokeAsync(distribution, instanceRoot, "inspect-backup", backupInput).GetAwaiter().GetResult();
+                Assert(backupPreview.Ok && WorkbenchPanelForm.BackupSummaryMessage(backupPreview.Data).Contains("恢复点捕获 UTC 时间：2026-11-04T08:09:10Z")
+                    && WorkbenchPanelForm.BackupSummaryMessage(backupPreview.Data).Contains("资料校验：校验通过"), "恢复点预检摘要格式");
+                Dictionary<string, object> restoredSummary = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>("{\"restore_summary\":{\"data\":{\"status\":\"verified_and_restored\",\"attachments_rebound\":2,\"external_cwd_not_materialized\":1,\"delivery_unknown_commands\":3},\"software\":{\"status\":\"restored_verified\"}}}");
+                Assert(WorkbenchPanelForm.ResultMessage(restoredSummary, null).Contains("未知投递命令 3") && WorkbenchPanelForm.ResultMessage(restoredSummary, null).Contains("下一步"), "恢复成功摘要在刷新失败前可保留");
+                fakeRunner.AssertInstanceConfig(instanceRoot, "inspect", "configure", "initialize", "inspect-backup");
                 fakeRunner.AssertManagerUtf8();
                 Assert(ProcessEncodings.Utf8NoBom.GetPreamble().Length == 0, "JSON stdin 不带 UTF-8 BOM");
                 Assert(WslDistributionList.Parse(ProcessEncodings.WslList.GetString(ProcessEncodings.WslList.GetBytes("中文发行版\r\n")))[0] == "中文发行版", "UTF-16 WSL 发行版列表解析");

@@ -28,6 +28,77 @@ def stopped(config):
         raise cfg.InstanceError('备份/恢复版本需要先安全停止此实例，未强行停写或覆盖。', 'instance_running')
 
 
+_V1_MANIFEST_KEYS = {'format_version', 'profile', 'installation', 'selected', 'versions',
+                     'data_manifest_sha256', 'workspace_executables'}
+_V2_MANIFEST_KEYS = _V1_MANIFEST_KEYS | {'created_at'}
+
+
+def _created_at(value):
+    """Accept only the v2 UTC wire format; never infer a time from filesystem metadata."""
+    if not isinstance(value, str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', value):
+        raise cfg.InstanceError('备份创建时间格式无效，未恢复。', 'invalid_backup')
+    try:
+        parsed = datetime.strptime(value, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+    except ValueError:
+        raise cfg.InstanceError('备份创建时间格式无效，未恢复。', 'invalid_backup') from None
+    if parsed.strftime('%Y-%m-%dT%H:%M:%SZ') != value:
+        raise cfg.InstanceError('备份创建时间格式无效，未恢复。', 'invalid_backup')
+    return value
+
+
+def backup_summary(value, backup_path):
+    """Public, path-free facts derived only after the bundle has been verified."""
+    cohort = data.verify_recovery_bundle(Path(backup_path) / 'data')
+    files = cohort['files']
+    database_count = sum(1 for item in cohort['databases'].values() if item != {'missing': True})
+    byte_count = sum(item['size'] for item in files.values())
+    needs_rebuild = value.get('_needs_rebuild', False)
+    return {
+        'format_version': value['format_version'],
+        'created_at': value.get('created_at', 'unknown'),
+        'created_at_kind': 'capture_utc' if value['format_version'] == 2 else 'unknown_legacy_v1',
+        'included': ['所选实例资料配置', 'state 白名单（含状态数据库和认证资料）', 'workspace',
+                     '当前健康程序及最多一个健康回退程序', '控制器和原生程序包'],
+        'excluded': ['原生登录缓存', 'workspace 外工程和文件', '主机实际网关和组网环境', '其他历史程序版本'],
+        'sensitive_notice': '备份含敏感明文资料（包括认证资料和所选实例配置），请妥善保管；它不是“完全不含凭据”的备份。',
+        'data': {'status': 'verified', 'files': len(files), 'databases': database_count,
+                 'bytes': byte_count},
+        'software': {'status': 'rebuild_required' if needs_rebuild else 'verified',
+                     'versions': len(value['versions']), 'rebuild_required': needs_rebuild},
+    }
+
+
+def _restore_summary(value, report, target, backup_path):
+    """Report only bounded post-restore facts; never return report internals or IDs."""
+    if (type(report) is not dict or type(report.get('rebound_attachment_ids')) is not list
+            or type(report.get('cwd_not_materialized')) is not list
+            or report.get('activated') is not False or report.get('commands_replayed') is not False):
+        raise cfg.InstanceError('恢复报告无效，未报告成功。', 'invalid_restore_report')
+    database = target / 'state/conversations.sqlite3'
+    try:
+        with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as connection:
+            unknown_count = connection.execute(
+                "SELECT count(*) FROM commands WHERE state='delivery_unknown'").fetchone()[0]
+        if report.get('restored_conversations_sha256') != runtime.digest(database):
+            raise ValueError('restore report does not match final database')
+    except (sqlite3.Error, ValueError) as error:
+        raise cfg.InstanceError('恢复后的命令状态无法核验，未报告成功。', 'invalid_restore_report') from error
+    needs_rebuild = value['_needs_rebuild']
+    return {
+        'restored_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'backup': backup_summary(value, backup_path),
+        'data': {'status': 'verified_and_restored', 'attachments_rebound': len(report['rebound_attachment_ids']),
+                 'external_cwd_not_materialized': len(report['cwd_not_materialized']),
+                 'delivery_unknown_commands': unknown_count},
+        'software': {'status': 'rebuild_required' if needs_rebuild else 'restored_verified',
+                     'rebuild_required': needs_rebuild, 'versions': len(value['versions'])},
+        'activated': False,
+        'commands_replayed': False,
+        'next_steps': ['需要重建时先安装当前程序', '本人重新原生登录、配置手机 HTTPS 并绑定手机',
+                       '检查新实例按默认重建的配置、工程与计划上下文', '核对未知投递，不自动续跑旧任务'],
+    }
+
+
 def backup(config, *, legacy_native=False):
     stopped(config)
     installed = runtime.software(config, legacy_native=legacy_native)
@@ -67,16 +138,17 @@ def backup(config, *, legacy_native=False):
                 (destination / 'native/LICENSE.txt').chmod(0o600)
         else:
             native.copy_bundle(root / 'native', destination / 'native')
-        cfg.write_json(destination / 'backup.json', {'format_version': 1, 'profile': config,
+        cfg.write_json(destination / 'backup.json', {'format_version': 2,
+            'created_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), 'profile': config,
             'installation': installed, 'selected': selected, 'versions': versions,
             'data_manifest_sha256': runtime.digest(destination / 'data/recovery-bundle.json'),
             'workspace_executables': sorted(name for name,path,item in runtime.bundle._entries(root / 'workspace')
                 if item.st_mode & 0o111 and not path.is_dir())}, replace=False)
-        verify(destination, allow_rebuild=legacy)
-        note = '仅备份此实例的状态、workspace 和健康程序；不包含原生登录缓存、其他目录或整台电脑。'
+        note = '仅备份所选实例资料配置、state 白名单、workspace 和健康程序；不包含原生登录缓存、workspace 外项目、主机实际网关或组网环境及其他历史版本。备份含敏感明文资料，请妥善保管。'
         if legacy:
             note += ' 此迁移恢复点包含旧版不完整单文件原生程序证据；恢复后必须重建当前完整原生包。'
-        return {'backup': str(destination), 'legacy_native': legacy, 'note': note}
+        verified = verify(destination, allow_rebuild=legacy)
+        return {'backup': str(destination), 'legacy_native': legacy, 'backup_summary': backup_summary(verified, destination), 'note': note}
     except BaseException:
         # Keep failed capture separate and explicit; do not delete user data or
         # present a partial tree as a valid backup.
@@ -90,13 +162,18 @@ def verify(path, *, allow_rebuild=False):
     cfg.private_directory(path)
     cfg.private_file(path / 'backup.json', max_size=2*1024*1024)
     value = json.loads((path / 'backup.json').read_text())
-    if (type(value) is not dict or set(value) != {'format_version', 'profile', 'installation',
-            'selected', 'versions', 'data_manifest_sha256', 'workspace_executables'} or type(value['format_version']) is not int
-            or value['format_version'] != 1 or type(value['versions']) is not list
-            or len(value['versions']) not in {1, 2}
-            or any(not re.fullmatch(r'\d{8}-\d{6}', str(version)) for version in value['versions'])
-            or value['selected'] != value['versions'][0]):
+    if type(value) is not dict or type(value.get('format_version')) is not int:
         raise cfg.InstanceError('备份清单不完整，未恢复。', 'invalid_backup')
+    version = value['format_version']
+    if ((version == 1 and set(value) != _V1_MANIFEST_KEYS)
+            or (version == 2 and set(value) != _V2_MANIFEST_KEYS)
+            or version not in {1, 2}
+            or type(value.get('versions')) is not list or len(value['versions']) not in {1, 2}
+            or any(not re.fullmatch(r'\d{8}-\d{6}', str(item)) for item in value['versions'])
+            or value.get('selected') != value['versions'][0]):
+        raise cfg.InstanceError('备份清单不完整，未恢复。', 'invalid_backup')
+    if version == 2:
+        _created_at(value['created_at'])
     # Use the same bounded metadata contract as installed instances BEFORE
     # any destination is created or the controller's target path is joined.
     runtime.validate_installation(value['installation'])
@@ -236,9 +313,10 @@ def restore(config, payload):
             note = ('已恢复到新目录，未覆盖原实例、未启动或重放；附件副本身份已重新绑定，外部目录和计划上下文仍需核验，原生与手机登录需本人重做。')
             if value['_needs_rebuild']:
                 note += '电脑 Python 环境与备份不同：只恢复了资料，旧程序未复制或运行。请为此新实例点“安装”重建当前软件。'
+            restore_summary = _restore_summary(value, json.loads((target / 'restore-report.json').read_text()), target, source)
             return {'root': str(target), 'activated': False,
                     'software_restored': not value['_needs_rebuild'], 'rebuild_required': value['_needs_rebuild'],
-                    'note': note}
+                    'restore_summary': restore_summary, 'note': note}
         except BaseException:
             if target.exists():
                 cfg.write_json(target / 'restore-incomplete.json', {'activated': False, 'complete': False})
