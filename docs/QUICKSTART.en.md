@@ -8,7 +8,7 @@ Once installed, you can send tasks from your phone, have your own computer perfo
 
 - Your computer needs Windows + Ubuntu 24.04 WSL2 (x86-64, Python 3.12). See the other required components in the [installation environment](../INSTALL.en.md#installation-environment). If WSL is not installed yet, first prepare Ubuntu 24.04 following [Microsoft’s installation instructions](https://learn.microsoft.com/windows/wsl/install), then return to this page.
 - Prepare your own Codex account and a network that can access software downloads and the model service. A proxy is not always required.
-- Prepare your own HTTPS URL for phone access. If you do not have one yet, see [how to prepare a phone URL](PHONE_ACCESS.en.md).
+- A stable HTTPS phone URL is required before starting the workbench, **not before installation**. Without one, complete steps 1–5 first, then follow [the phone-access guide](PHONE_ACCESS.en.md) at step 6.
 
 ## 1. Download and install
 
@@ -20,7 +20,7 @@ Once installed, you can send tasks from your phone, have your own computer perfo
 ## 2. Sign in and start
 
 5. Click “原生账号登录” (Native account sign-in), complete your own Codex sign-in in the terminal and browser that open, then click “运行检查” (Run checks). Do not send device codes or sign-in credentials to anyone.
-6. Enter your own stable URL in “手机 HTTPS 入口” (Phone HTTPS entry), save it, and click “启动” (Start). If you do not already have a URL, choose a method in [how to obtain a URL](PHONE_ACCESS.en.md) first.
+6. Note “本机地址” (Local address) in the check result. Follow [the phone-access guide](PHONE_ACCESS.en.md) to connect that WSL loopback address through a filtering gateway and obtain a stable HTTPS URL. Enter the URL in “手机 HTTPS 入口” (Phone HTTPS entry), save it, and click “启动” (Start). A new tunnel may return 502 until this step starts the workbench.
 
 ## 3. Open it from your phone
 

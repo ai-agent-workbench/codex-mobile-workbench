@@ -1,50 +1,93 @@
 # How to obtain a phone-access URL
 
-[返回中文版 / Chinese version](PHONE_ACCESS.md)
+[简体中文](PHONE_ACCESS.md) · [English](PHONE_ACCESS.en.md)
 
-Your phone accesses the workbench through an HTTPS URL. If you do not already have one, prepare it by one of the two methods below.
+For a first connection, start with a **private network between your own devices**. Consider a hosted public entry if you prefer not to install a connection client on your phone. Both need stable, trusted HTTPS and workbench authentication. A connected tunnel alone does not prove the workbench works.
 
-First complete software installation on the computer using the [Quick Start](QUICKSTART.en.md), then click “运行检查” (Run checks) in the panel and note the displayed local address. **Give the local address to the connection tool; enter the HTTPS URL provided by the connection tool back into the workbench panel.**
+| Route | Phone requirements | Trade-off |
+| --- | --- | --- |
+| Tailscale Serve | Tailscale client and your own account | No separate domain purchase; access stays within the authorized private network; both devices must remain connected |
+| Cloudflare Tunnel | Browser | Your own account and manageable domain; published entry is publicly reachable, requiring review of privacy, costs and access rules |
 
-## Method 1: install a connection tool on both computer and phone
+These are configuration and checking instructions, not automatic setup. Neither third-party route has completed this project's second-computer/physical-phone end-to-end acceptance. Local gateway checks are not that acceptance. See the [support matrix (Chinese)](SUPPORT_MATRIX.md).
 
-Using [Tailscale Serve](https://tailscale.com/kb/1312/serve) as an example:
+## Install first; obtain the URL afterwards
 
-1. Install Tailscale on the computer and phone, sign in to the same account on both devices, and confirm that both are online.
-2. On the computer, follow its official instructions to enable HTTPS access and connect it to the workbench’s local port according to the requirements below.
-3. Copy the HTTPS URL shown by Tailscale into “手机 HTTPS 入口” (Phone HTTPS entry) in the workbench panel.
+1. Complete [Quick Start](QUICKSTART.en.md) steps 1–5: install the software and sign in to your own Codex. **No phone URL or workbench startup is required yet.**
+2. Click “运行检查” (Run checks), and note “本机地址” (Local address), such as `http://127.0.0.1:PORT`. This address is loopback **inside the selected Ubuntu WSL distribution**, not your phone URL.
+3. Run the gateway and connection program below **inside that same Ubuntu**. Windows loopback is not interchangeable with WSL loopback. Do not change WSL networking, open firewall ports, or bind to `0.0.0.0` to copy this example. An existing Windows-side connector needs its own verified path.
 
-This suits access between your own devices and does not require buying another domain for it; the phone needs the connection client installed and kept connected.
+## 1. Prepare a filtering gateway in that WSL distribution
 
-## Method 2: connect the computer to a hosted service; use only a browser on the phone
+Both routes use: `phone HTTPS → connection program → filtering gateway at 127.0.0.1:18081 → panel's local address`. Do not point the tunnel directly at the application port: `/internal` and its subpaths must be blocked first.
 
-Using [Cloudflare Tunnel](https://developers.cloudflare.com/tunnel/) as an example:
+You need a trusted Nginx installation in that Ubuntu. Prepare it under your system/organization's rules if absent; do not replace system Nginx configuration or take over an existing site. This example runs a separate loopback process, not a site in `/etc/nginx`.
 
-1. Prepare your own service account and a domain you can manage.
-2. Install its connection program on the computer, create a tunnel, configure a stable HTTPS URL for the workbench, and connect it to the local service according to the requirements below.
-3. Enter this URL in the workbench panel; then the phone can open it with a browser.
+In Ubuntu:
 
-This requires one fewer app on the phone, but you must prepare a domain and check the service’s cost, privacy, and access settings. A public entry point must retain workbench authentication for yourself.
+```bash
+# If this directory exists, stop and inspect its purpose; do not overwrite it.
+mkdir -m 700 "$HOME/codex-phone-gateway" || exit 1
+mkdir -m 700 "$HOME/codex-phone-gateway/logs" || exit 1
+ss -ltn '( sport = :18081 )'
+```
 
-These are examples of common methods, not a requirement to use a particular provider. For what this project has and has not verified, see the [support notes (Chinese)](SUPPORT_MATRIX.md). They do not mean the project has verified these methods in a real environment.
+If port 18081 is occupied, stop and choose another unused high port, replacing every gateway address below consistently. Open the [gateway configuration sample](examples/phone-gateway.nginx.conf) and save its contents as `$HOME/codex-phone-gateway/nginx.conf`. Replace `WORKBENCH_PORT` with the actual port from the panel, **not** an App Server port. The sample's 50 MiB request-body limit does not promise application support for every upload size.
 
-## After the URL is ready
+```bash
+nginx -p "$HOME/codex-phone-gateway/" -c nginx.conf -t || exit 1
+# Start only after the configuration check succeeds.
+nginx -p "$HOME/codex-phone-gateway/" -c nginx.conf
+curl --noproxy '*' -i http://127.0.0.1:18081/internal
+curl --noproxy '*' -i http://127.0.0.1:18081/internal/check
+```
 
-Complete your own Codex sign-in, save the URL in the panel, and click “启动” (Start). Then scan the QR code or open the URL on your phone. Once the correct sign-in page appears, follow the [Quick Start](QUICKSTART.en.md) to bind your phone and complete the first task.
+Both requests must return **404**. Ordinary `/login` may return 502 until the workbench starts; obtain the HTTPS URL next instead of reinstalling or repeatedly signing in to Codex. The gateway preserves WebSocket and Host, and sets the forwarded scheme to HTTPS for traffic arriving through the HTTPS connector. It listens only on loopback, not as a LAN HTTP entry.
 
-The URL should remain stable so you can continue signing in later. Copy the actual address given by the service; do not copy an example in documentation or the author’s address.
+## 2A. Private networking: Tailscale Serve (suggested first route)
 
-## Entry-point configuration requirements
+1. Follow the [official Serve guide](https://tailscale.com/kb/1312/serve) to prepare and sign in to Tailscale **inside that Ubuntu**. Install the phone client and connect to the same private network using your own account. Review existing Windows clients/network policies before adding anything; do not migrate or overwrite them. Check access rules rather than assuming the same account alone guarantees connectivity.
+2. Run `tailscale serve status` in Ubuntu. If Serve already has configuration, do not overwrite it; arrange a separate entry for this instance first. For a new entry:
 
-- Forward only the workbench’s local port. Do not expose the native App Server or socket.
-- Block `/internal` and all its subpaths; retain WebSocket and correct Host/HTTPS information.
-- Use a dedicated HTTPS hostname; changing only a path or port does not isolate cookies. Retain your own authentication: a private network does not replace workbench sign-in.
-- When using a private network, do not switch it to public mode or overwrite existing services without authorization. If the URL changes after binding, follow the recovery procedure.
+   ```bash
+   tailscale serve --bg http://127.0.0.1:18081
+   ```
 
-For Tailscale HTTPS setup, also see the [official instructions](https://tailscale.com/kb/1153/enabling-https). Before enabling it, read the service’s privacy notice; device names must not include sensitive information.
+3. If asked to enable HTTPS, follow the provider's consent process and read the [certificate/device-name privacy notes](https://tailscale.com/kb/1153/enabling-https). Resolve permission errors through the provider's normal authorization flow; do not remove authentication or switch to public Funnel. This example uses **Serve, not Funnel**.
+4. Copy the actual stable HTTPS URL shown by the command. The phone must remain connected to an authorized Tailscale network. Do not substitute an example, the author's URL, or WSL loopback.
 
-## What to check first when it will not open
+## 2B. Hosted entry: Cloudflare Tunnel
 
-- The page will not open: check that the workbench has started and the connection program is online; when using a private network, the phone must also be connected.
-- There is a certificate warning or it opens another site: correct the URL and configuration before binding the phone.
-- The page opens but the task fails: check phone binding, Codex sign-in, and model connection separately; do not repeatedly send the same task with an unknown status.
+For owners of a manageable domain who want phone-browser access, follow the [official remotely managed tunnel guide](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/):
+
+1. Create a tunnel under your own account. Install, authorize and run its `cloudflared` connector **inside the same Ubuntu**. Token-bearing installation commands belong only in your trusted terminal, never Issues, screenshots or sample configurations.
+2. Add a published application route for a dedicated hostname, not just a different path or port. Choose Service type **HTTP**, URL `127.0.0.1:18081`. Do not use the application port or override HTTP Host Header to localhost.
+3. Preserve WebSocket and disable custom rules that cache private pages/APIs. Confirm the connector is online and copy the HTTPS URL. Publishing this route makes the entry publicly reachable; review third-party access policies without replacing workbench authentication.
+
+Do not use a random Quick Tunnel URL for persistent pairing or disable certificate validation. Neither connector nor gateway may expose the native App Server or Unix socket.
+
+## 3. Save the URL, start, and check from the phone
+
+1. Enter the real URL in “手机 HTTPS 入口” (Phone HTTPS entry), save, then click “启动” (Start). Saving changes this instance's settings; it does not establish networking.
+2. On the phone's actual network, open `https://YOUR-ACTUAL-HOST/login`. Expect the workbench sign-in page with no certificate warning. Check `/internal` and `/internal/check` at that hostname: both must return 404. If another site, an internal endpoint or a certificate warning appears, stop and fix the connection before pairing.
+3. Complete [Quick Start](QUICKSTART.en.md) steps 8–10: bind your own phone, explicitly choose new-conversation permissions, and generate/download the first file. A working page alone does not prove WebSocket or model connectivity; check live task progress and the correct file.
+
+Pair only after the URL is stable. A later URL change needs the [recovery procedure (Chinese)](OPERATIONS.md). You provide the domain, services and model costs; do not copy the author's connection details or credentials.
+
+## Stop, restart and common blockers
+
+This Nginx example is manually started, not registered as an autostart service. After WSL restarts, verify the connector, restart this gateway and the workbench, then check again from the phone. Tailscale `--bg` does not start Nginx or the workbench. For unattended operation, arrange service management suited to your own environment rather than copying the author's production units.
+
+Stop **only this example's gateway** (not other Nginx instances):
+
+```bash
+nginx -p "$HOME/codex-phone-gateway/" -c nginx.conf -s quit
+```
+
+- **502:** check workbench startup and the actual upstream application port before reinstalling.
+- **Cannot open:** check WSL, gateway and connector; private networking also needs the phone connection and access rules.
+- **Certificate warning/wrong site:** fix the URL, domain and routing before pairing.
+- **Can sign in but progress stalls:** check WebSocket forwarding; do not cache APIs.
+- **Page works but task fails:** separately check permissions, native Codex sign-in and model networking; do not resend a task with unknown status.
+
+Third-party official pages checked on 2026-11-05. Follow current official instructions if provider UI or commands change.
