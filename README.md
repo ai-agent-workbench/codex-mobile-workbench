@@ -37,8 +37,13 @@
 任务生成的文件有自己的查看和下载入口。把处理好的文档、代码或其他文件带走，而不只是截下一段聊天记录。
 
 <p align="center">
-  <img src="docs/assets/workflow-demo.png" width="340" alt="合成工作流：关联读书笔记，发起任务，预览并下载行动清单">
-  <br><sub>可交互合成演示的截图，非实机录屏；只使用公开样例，不连接模型或私人资料。</sub>
+  <img src="docs/assets/workbench-overview.png" width="960" alt="Codex Mobile Workbench 公开 preview.4 界面总览：项目任务、对话成果与设置">
+  <br><sub>公开 preview.4 界面；合成示例，非真实任务记录。模型目录来自公开测试夹具，仅作示例；实际可用模型和选项随账户与原生运行时变化。</sub>
+</p>
+
+<p align="center">
+  <img src="docs/assets/workbench-task-result.png" width="960" alt="公开 preview.4 界面中的合成对话成果和文件下载入口">
+  <br><sub>公开 preview.4 界面；合成示例，非真实任务记录。</sub>
 </p>
 
 想亲手点一遍？完整下载源码或安装包后，在浏览器打开 [`docs/demo.html`](docs/demo.html)：添加样例 → 模拟任务 → 下载 CSV → 模拟返回原任务。[演示说明](docs/DEMO.md)
@@ -52,6 +57,8 @@
 这次开源的，是一条已经完成独立实例安装、手机绑定、真实任务和文件下载核心验证的路径。接下来，希望让更多有相同需求的人，能在自己的电脑上把它跑起来。
 
 **代码不是终点。让自己的想法，变成真正能用的工具，才是。**
+
+作者也把实际的自用流程写成了[自用案例（中文）](https://juejin.cn/post/7707927071724765193)。文章展示的是作者自用工作流，界面可能与公开版本不同，不代表预览包新增功能。
 
 ## 它连接的是你自己的 Codex
 
@@ -144,8 +151,13 @@ Check progress, follow up within the same project, add files, refine requirement
 Generated files have their own preview and download links. Take the finished documents, code, or other files with you, instead of just a screenshot of a chat.
 
 <p align="center">
-  <img src="docs/assets/workflow-demo.png" width="340" alt="Synthetic workflow: attach reading notes, start a task, preview and download an action list">
-  <br><sub>A screenshot of the interactive synthetic demo, not a recording of a live installation. It uses public samples only, with no model connection or private data.</sub>
+  <img src="docs/assets/workbench-overview.png" width="960" alt="Public preview.4 workbench overview: project task, conversation result, and settings">
+  <br><sub>Public preview.4 interface; synthetic examples, not real task records. The model catalog comes from public test fixtures only; available models and options vary by account and native runtime.</sub>
+</p>
+
+<p align="center">
+  <img src="docs/assets/workbench-task-result.png" width="960" alt="Public preview.4 interface showing a synthetic conversation result and file download entry">
+  <br><sub>Public preview.4 interface; synthetic examples, not real task records.</sub>
 </p>
 
 Want to try the interaction? Download the full source or installation package, then open [`docs/demo.html`](docs/demo.html) in a browser: add a sample → simulate a task → download a CSV → simulate returning to the original task. [Demo guide (中文)](docs/DEMO.md)
@@ -159,6 +171,8 @@ The project grew out of my everyday workbench: maintaining projects, investigati
 The path shared here has been checked with an independent instance installation, phone pairing, a real task, and a file download. The next goal is to help other people with the same need run it on their own computers.
 
 **The code isn't the destination. Turning your own ideas into tools you can actually use is.**
+
+The author also documents a [personal-use example (Chinese)](https://juejin.cn/post/7707927071724765193). It shows the author's own workflow; its interface may differ from the public version and does not represent new preview-package features.
 
 ## It connects to your own Codex
 
