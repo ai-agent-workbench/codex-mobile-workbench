@@ -46,7 +46,7 @@
   <br><sub>公开 preview.4 界面；合成示例，非真实任务记录。</sub>
 </p>
 
-想亲手点一遍？完整下载源码或安装包后，在浏览器打开 [`docs/demo.html`](docs/demo.html)：添加样例 → 模拟任务 → 下载 CSV → 模拟返回原任务。[演示说明](docs/DEMO.md)
+想先看看再决定要不要安装？打开[在线介绍与合成流程演示](https://ai-agent-workbench.github.io/codex-mobile-workbench/)：无需账号，添加固定样例 → 模拟任务 → 下载 CSV → 模拟返回原任务。它不连接模型或私人资料，不是真实执行；普通安装也不需要先 Fork。离线版本仍可下载后打开 [`docs/demo.html`](docs/demo.html)。[演示说明](docs/DEMO.md)
 
 ## 它是怎么来的
 
@@ -160,7 +160,7 @@ Generated files have their own preview and download links. Take the finished doc
   <br><sub>Public preview.4 interface; synthetic examples, not real task records.</sub>
 </p>
 
-Want to try the interaction? Download the full source or installation package, then open [`docs/demo.html`](docs/demo.html) in a browser: add a sample → simulate a task → download a CSV → simulate returning to the original task. [Demo guide (中文)](docs/DEMO.md)
+Want to understand the workflow before installing? Open the [online overview and synthetic workflow demo](https://ai-agent-workbench.github.io/codex-mobile-workbench/): no account needed; add a fixed sample → simulate a task → download a CSV → simulate returning to the original task. It uses no model or private data and is not a real execution. Forking is not required to install. The offline version remains available in [`docs/demo.html`](docs/demo.html). [Demo guide (中文)](docs/DEMO.md)
 
 ## Where it came from
 
