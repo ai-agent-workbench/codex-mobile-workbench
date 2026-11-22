@@ -11,11 +11,12 @@ import tarfile
 
 from shared import instance_config as cfg
 
-VERSION = '0.160.0'
-URL = 'https://github.com/openai/codex/releases/download/rust-v0.160.0/codex-package-x86_64-unknown-linux-musl.tar.gz'
-ARCHIVE_SIZE = 160727443
-ARCHIVE_SHA256 = '4fcc47ab57f52ff75363951a8761146cd10c8288bd86fed45487dbb204a16b71'
-MEMBERS = (('bin', '5', 0, None),
+PREVIOUS_VERSION = '0.160.0'
+VERSION = '0.171.0'
+_PREVIOUS_URL = 'https://github.com/openai/codex/releases/download/rust-v0.160.0/codex-package-x86_64-unknown-linux-musl.tar.gz'
+_PREVIOUS_ARCHIVE_SIZE = 160727443
+_PREVIOUS_ARCHIVE_SHA256 = '4fcc47ab57f52ff75363951a8761146cd10c8288bd86fed45487dbb204a16b71'
+_PREVIOUS_MEMBERS = (('bin', '5', 0, None),
  ('bin/codex', '0', 289101384, '12eb3e81114588aca3b7998f4f19e8997b056aca08e57a7ca7c8a3ec8c652aad'),
  ('bin/codex-code-mode-host', '0', 74072976, '37cab1584302611e9936902219640ab5e7a79fcfccd2504c6e85ea8cb97d0e10'),
  ('codex-package.json', '0', 205, '2aa6a23f733c278a9bf385f0725b97b76708559d31209636cb165c1c872a40ef'),
@@ -174,11 +175,145 @@ MEMBERS = (('bin', '5', 0, None),
 LICENSE_NAME = "LICENSE.txt"
 LICENSE_SIZE = 10926
 LICENSE_SHA256 = "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc"
-EXECUTABLES = frozenset({
+_PREVIOUS_EXECUTABLES = frozenset({
     "bin/codex", "bin/codex-code-mode-host", "codex-path/rg",
     "codex-resources/bwrap", "codex-resources/voice/bin/codex-voice-host",
     "codex-resources/zsh/bin/zsh",
 })
+
+
+# Verified upstream full Linux x64 kit; the source ZIP does not redistribute it.
+URL = 'https://github.com/openai/codex/releases/download/rust-v0.171.0/codex-package-x86_64-unknown-linux-musl.tar.gz'
+ARCHIVE_SIZE = 197763180
+ARCHIVE_SHA256 = '8391d67757496bfd14893eca6cbf0c96994bf2627566ff1f018f70600c9ef6b3'
+MEMBERS = (('bin', '5', 0, None),
+ ('bin/codex', '0', 315109048, 'b76a027d6b210f9a8da7aaf321dd235c700f0ef7a794d4a5314b9af6c134f0f0'),
+ ('bin/codex-code-mode-host', '0', 70072856, 'f49bd4f0c0cc73cf1ec3a719009e07ce5b6e100520d023c760cc203fb37e5c6f'),
+ ('bin/codex-exec-server', '0', 77627248, 'da2b3636f0b050e4b97da5cf8ed6b3f85621d7611105f58ee9748d8c7e2266fe'),
+ ('codex-package.json', '0', 246, 'dd7e534b6f3474b0bb01934d05dfd9f0dfbf848502f0465c8116bb04d616c20b'),
+ ('codex-path', '5', 0, None),
+ ('codex-path/rg', '0', 5408904, 'e62198eb19b136b88c330af83647b5a962cb99b6b1f066758568f12de1974849'),
+ ('codex-resources', '5', 0, None),
+ ('codex-resources/bwrap', '0', 492984, '91a245ea678a7ae642f383a22576c3c476d0d6d3e2321a553f3ed8d4d487ed74'),
+ ('codex-resources/voice', '5', 0, None),
+ ('codex-resources/voice/NOTICE.md', '0', 2403, '40097a1799441051aa0b6645cdc819cceb19be73cdd265eb602aa2b15e0b1f48'),
+ ('codex-resources/voice/bin', '5', 0, None),
+ ('codex-resources/voice/bin/codex-voice-host',
+  '0',
+  40481464,
+  '1b072d76224a57aaaca75497bcb2b5c458f6f21467c6c09cf137a4aa529e4ff3'),
+ ('codex-resources/voice/lib', '5', 0, None),
+ ('codex-resources/voice/lib/gstreamer-1.0', '5', 0, None),
+ ('codex-resources/voice/lib/gstreamer-1.0/libgstapp.so',
+  '0',
+  6488,
+  '140af8f4c349124d1c95fb28752c1320b1c1cd8830b4e44ecaf9aec0eb868631'),
+ ('codex-resources/voice/lib/gstreamer-1.0/libgstaudioconvert.so',
+  '0',
+  41040,
+  '9d85c49871bd4aced64ab7395552e4deabc2bb675885b1405f3cc5d93f36de28'),
+ ('codex-resources/voice/lib/gstreamer-1.0/libgstaudioresample.so',
+  '0',
+  35248,
+  '17caea8022342bb088dcf6b9a3369eb1d88ee94abc57d600de65b797e704cc86'),
+ ('codex-resources/voice/lib/gstreamer-1.0/libgstcoreelements.so',
+  '0',
+  479464,
+  '562f60c464252841d10807675fe800c4a0c673910771562ae57e1b653058a22a'),
+ ('codex-resources/voice/lib/gstreamer-1.0/libgstopus.so',
+  '0',
+  73496,
+  'a5f9e9fb8700e53f727414085b47ba7dc4124855df047238f1bc52a95033fb91'),
+ ('codex-resources/voice/lib/gstreamer-1.0/libgstrtp.so',
+  '0',
+  759304,
+  'ad625aae7c96e2ac07c124fe86d04e3e47d574723f94c84b4334abbcb7ade2c8'),
+ ('codex-resources/voice/lib/gstreamer-1.0/libgstrtpmanager.so',
+  '0',
+  563976,
+  'b8199fdd0f38f40cd4f7b075792d73824914c14f6fc9886829bddf3abce41bd5'),
+ ('codex-resources/voice/lib/libffi.so.8', '0', 63088, '9343712fef5adb7f0d00b6f9c96d3b76c7eaed0ff3f96b1db665c221e68c2c7c'),
+ ('codex-resources/voice/lib/libgio-2.0.so.0',
+  '0',
+  2336176,
+  'b8e821b78ebf2bf6f44b7a01ce94b029f3bba6c5469b399a1406ac83eaf17bcf'),
+ ('codex-resources/voice/lib/libglib-2.0.so.0',
+  '0',
+  1520592,
+  'c352bfa2e91f7b55fa5811d2c13a2e302f75011720d7cccc24ecea386ec2d115'),
+ ('codex-resources/voice/lib/libgmodule-2.0.so.0',
+  '0',
+  15736,
+  '7ab0e8a6e611e90f49f3c05d40fd0414468088936c684f186ab28448d4fcdc64'),
+ ('codex-resources/voice/lib/libgobject-2.0.so.0',
+  '0',
+  455408,
+  '6e9f18a820d323996059ec5bc61022ca4f2616e2f1aceb62873f492bea02d080'),
+ ('codex-resources/voice/lib/libgstallocators-1.0.so.0',
+  '0',
+  30352,
+  'fafd125d171e5e1380ab4f7516d5271910894a1dd25f257eb0d6e5d9b0a3a453'),
+ ('codex-resources/voice/lib/libgstapp-1.0.so.0',
+  '0',
+  106128,
+  'f8c71b4888187b963ae3afcf403f5cf54f05e566f14fec9a3674f2723b69ce21'),
+ ('codex-resources/voice/lib/libgstaudio-1.0.so.0',
+  '0',
+  637664,
+  '45087b6be7d7c315d9a0f554c0e003684df6cf8823e9187f85047d2f50310ecc'),
+ ('codex-resources/voice/lib/libgstbase-1.0.so.0',
+  '0',
+  573472,
+  'c858b1b65ba92e1104b026d119a59fdd817e73651f2f7f8e60b915dcb84a823d'),
+ ('codex-resources/voice/lib/libgstnet-1.0.so.0',
+  '0',
+  74160,
+  '2984c7c5e7ced0da7bebc79f734a02f0cd9009daff52ef60c3b5cc51c7004435'),
+ ('codex-resources/voice/lib/libgstpbutils-1.0.so.0',
+  '0',
+  323208,
+  '601e271b6c2be4ee5f2cf298d74356563b5c4ecf76ddb2c53945b1801feff896'),
+ ('codex-resources/voice/lib/libgstreamer-1.0.so.0',
+  '0',
+  1582984,
+  '4114014dd07e0cf59b80eb50db8fcf9e2e2a44bde53cdbd930ccaf36038440d3'),
+ ('codex-resources/voice/lib/libgstrtp-1.0.so.0',
+  '0',
+  211696,
+  '984a3430ecffee72d202030df13b8c15cfc84ce1644e9ca53248ef8c10e25d9e'),
+ ('codex-resources/voice/lib/libgsttag-1.0.so.0',
+  '0',
+  273992,
+  '3fc269705e4ee71bb11f6c259f8a2a739e9bafbb5fb90d7148a03bf1ac7f6abd'),
+ ('codex-resources/voice/lib/libgstvideo-1.0.so.0',
+  '0',
+  1006016,
+  '307f9bb3017236f60c6bbbaa7a26e5e8889298619e7c7917deef4362e939d6ce'),
+ ('codex-resources/voice/lib/libintl.so.8', '0', 6304, '52508cf6dadff7cc431dd76d1f36754eb4184f56a49f93442f1a48bcb240df20'),
+ ('codex-resources/voice/lib/libopus.so.0', '0', 563184, '50d6c07e5863eecea08fd2e7e9a851b8d46b0b74f8b57645eac2ee54d5087a6d'),
+ ('codex-resources/voice/lib/libpcre2-8.so.0',
+  '0',
+  441864,
+  '6d589f935f093df4fbcebf01b7f8afa997378f4a4ac5fd0a76e0c5f604af64b7'),
+ ('codex-resources/voice/lib/libz.so.1', '0', 110112, '7088b2cc0f2812f6617666d851bd779925de4350a87ef0a288bbedda87e76083'),
+ ('codex-resources/voice/licenses', '5', 0, None),
+ ('codex-resources/voice/licenses/LGPL-2.1.txt',
+  '0',
+  26431,
+  'ad2eec519ebd4b5df86ea84dff24ae3bfa2edea846a703b58902dd221ae375db'),
+ ('codex-resources/voice/licenses/Opus.txt', '0', 1945, '01e1167d54a096d123cf6dfbbeb19587278845c6481d2d66d545669846079551'),
+ ('codex-resources/voice/licenses/PCRE2.md', '0', 4011, '197d8a73ffee0d6b09adba2f9c677b5f5aede24edf89258a68e48248d010d811'),
+ ('codex-resources/voice/licenses/libffi.txt', '0', 1132, '17b64dc60f3b6897a60f971e288b973f655c2edcdf08b25f3c3dd5549857881c'),
+ ('codex-resources/voice/licenses/proxy-libintl.txt',
+  '0',
+  25292,
+  'd245807f90032872d1438d741ed21e2490e1175dc8aa3afa5ddb6c8e529b58e5'),
+ ('codex-resources/voice/licenses/sljit.txt', '0', 1444, '5f216505c0f6ea3273caec89e766eef93cdeb7bbb0c429f9360116d7c938feeb'),
+ ('codex-resources/voice/licenses/zlib.txt', '0', 1002, 'e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2'),
+ ('codex-resources/voice/manifest.json', '0', 4768, '2488496113f14d1ac5705f6b0cbc1d4ec88f9234c1820d3b1380050363676ef3'),
+ ('codex-resources/voice/runtime.json', '0', 13941, 'fbadfc83a42b63ac132f12c909ed8072d6056b5648c8f88c57937c3763648c13'),
+ ('codex-resources/voice/sources.json', '0', 4911, '5613f37012effc3e28cdad52a7c88b9098aaaf7aae43f3cb7199f55ffbb15908'))
+EXECUTABLES = _PREVIOUS_EXECUTABLES | {'bin/codex-exec-server'}
 
 
 def digest(path: Path) -> str:
@@ -189,14 +324,36 @@ def digest(path: Path) -> str:
     return value.hexdigest()
 
 
-def manifest_identity() -> str:
-    return hashlib.sha256(json.dumps({"members": MEMBERS, "license": (LICENSE_SIZE, LICENSE_SHA256)}, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+def _pin(version: str | None = None):
+    if version is None or version == VERSION:
+        return URL, ARCHIVE_SIZE, ARCHIVE_SHA256, MEMBERS, EXECUTABLES
+    if version == PREVIOUS_VERSION:
+        return _PREVIOUS_URL, _PREVIOUS_ARCHIVE_SIZE, _PREVIOUS_ARCHIVE_SHA256, _PREVIOUS_MEMBERS, _PREVIOUS_EXECUTABLES
+    _error()
 
 
-def metadata() -> dict:
-    return {"format_version": 2, "version": VERSION, "source": URL,
-            "archive_size": ARCHIVE_SIZE, "archive_sha256": ARCHIVE_SHA256,
-            "manifest_sha256": manifest_identity()}
+def manifest_identity(version: str | None = None) -> str:
+    members = _pin(version)[3]
+    return hashlib.sha256(json.dumps({"members": members, "license": (LICENSE_SIZE, LICENSE_SHA256)}, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+
+
+def metadata(version: str | None = None) -> dict:
+    version = VERSION if version is None else version
+    url, size, checksum, _, _ = _pin(version)
+    return {"format_version": 2, "version": version, "source": url,
+            "archive_size": size, "archive_sha256": checksum, "manifest_sha256": manifest_identity(version)}
+
+
+def known_metadata(value: object) -> bool:
+    return value == metadata() or value == metadata(PREVIOUS_VERSION)
+
+
+def _metadata_version(value: dict | None) -> str:
+    if value is None:
+        return VERSION
+    if not known_metadata(value):
+        _error()
+    return value["version"]
 
 
 def command(root: Path) -> Path:
@@ -214,8 +371,8 @@ def _relative(name: str) -> PurePosixPath:
     return path
 
 
-def _expected() -> dict[str, tuple[str, int, str | None]]:
-    return {name: (kind, size, checksum) for name, kind, size, checksum in MEMBERS}
+def _expected(version: str) -> dict[str, tuple[str, int, str | None]]:
+    return {name: (kind, size, checksum) for name, kind, size, checksum in _pin(version)[3]}
 
 
 def _private_dir(path: Path) -> None:
@@ -224,8 +381,9 @@ def _private_dir(path: Path) -> None:
         _error("unsafe_permissions")
 
 
-def _verify_tree(root: Path) -> None:
-    expected = _expected()
+def _verify_tree(root: Path, version: str) -> None:
+    expected = _expected(version)
+    executables = _pin(version)[4]
     try:
         actual = {relative: (path, info) for relative, path, info in _entries(root)}
     except (OSError, ValueError):
@@ -238,7 +396,7 @@ def _verify_tree(root: Path) -> None:
             if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
                 _error()
         else:
-            mode = 0o700 if name in EXECUTABLES else 0o600
+            mode = 0o700 if name in executables else 0o600
             if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1
                     or stat.S_IMODE(info.st_mode) != mode or info.st_size != size or digest(path) != checksum):
                 _error()
@@ -264,14 +422,14 @@ def _entries(root: Path):
 
 
 def verify(root: Path, value: dict | None = None) -> None:
-    if value is not None and value != metadata():
-        _error()
-    _verify_tree(root)
+    _verify_tree(root, _metadata_version(value))
 
 
-def unpack(archive: Path, destination: Path) -> None:
+def unpack(archive: Path, destination: Path, value: dict | None = None) -> None:
     """Extract only the pinned files into an empty private staging directory."""
-    expected = _expected()
+    version = _metadata_version(value)
+    expected = _expected(version)
+    executables = _pin(version)[4]
     seen: set[str] = set()
     try:
         with tarfile.open(archive, "r:gz") as data:
@@ -297,7 +455,7 @@ def unpack(archive: Path, destination: Path) -> None:
                 with stream, os.fdopen(fd, "wb") as output:
                     shutil.copyfileobj(stream, output)
                     output.flush(); os.fsync(output.fileno())
-                target.chmod(0o700 if name in EXECUTABLES else 0o600)
+                target.chmod(0o700 if name in executables else 0o600)
                 if digest(target) != checksum:
                     _error()
     except (tarfile.TarError, OSError):
@@ -312,10 +470,11 @@ def add_license(destination: Path, source: Path) -> None:
     target.chmod(0o600)
 
 
-def copy_bundle(source: Path, destination: Path) -> None:
-    verify(source)
+def copy_bundle(source: Path, destination: Path, value: dict | None = None) -> None:
+    verify(source, value)
+    _, _, _, members, executables = _pin(_metadata_version(value))
     destination.mkdir(mode=0o700)
-    for name, kind, _, _ in MEMBERS:
+    for name, kind, _, _ in members:
         target = destination / name
         original = source / name
         if kind == "5":
@@ -323,7 +482,7 @@ def copy_bundle(source: Path, destination: Path) -> None:
             target.chmod(0o700)
         else:
             shutil.copyfile(original, target)
-            target.chmod(0o700 if name in EXECUTABLES else 0o600)
+            target.chmod(0o700 if name in executables else 0o600)
     shutil.copyfile(source / LICENSE_NAME, destination / LICENSE_NAME)
     (destination / LICENSE_NAME).chmod(0o600)
-    verify(destination)
+    verify(destination, value)

@@ -18,7 +18,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from engine.codex_app_server import CodexAppServerClient, AppServerProtocolError
+from engine.codex_app_server import (
+    AppServerError, CodexAppServerClient, AppServerProtocolError,
+)
 from engine.conversation_automation import AutomationStore, AutomationScheduler
 from shared.automation_tools import tool_response
 from engine.conversation_runtime import (
@@ -873,6 +875,87 @@ class ConversationService:
             if next_position < len(snapshot.conversation_ids) else None
         )
         return {"values": values, "next_cursor": next_cursor}
+
+    async def native_title_search_public_page(
+        self,
+        query: str | SearchQuery,
+        *,
+        account_id: str | None,
+        project_id: str | None | object = ...,
+        cursor: str | None = None,
+    ) -> dict[str, Any]:
+        """Supplement local search with native title matches from owned rows.
+
+        Native receives only an application-built batch of thread IDs. Its
+        returned IDs are then independently rechecked against the same owner
+        and project predicate before a local card is emitted.
+        """
+        parsed = query if isinstance(query, SearchQuery) else normalize_search_query(query)
+        base_scope = (
+            "all" if project_id is ... else
+            "temporary" if project_id is None else "project:" + str(project_id)
+        )
+        scope = "native-title:" + base_scope + ":" + parsed.scope_hash
+        if cursor is None:
+            candidates = self.store.native_title_search_candidates(
+                account_id=account_id, project_id=project_id,
+            )
+            snapshot = self._pages.start(
+                [candidate["id"] for candidate in candidates],
+                account_id=account_id, scope=scope,
+            )
+            position = 0
+        else:
+            snapshot, position = self._pages.resume(
+                cursor, account_id=account_id, scope=scope,
+            )
+        end = min(len(snapshot.conversation_ids), position + 100)
+        candidate_ids = list(snapshot.conversation_ids[position:end])
+        # Recheck immediately before Native: old cursors cannot retain a
+        # conversation after deletion, owner change, or project relocation.
+        candidates = self.store.native_title_search_candidates(
+            account_id=account_id, project_id=project_id,
+            conversation_ids=candidate_ids,
+        )
+        next_cursor = (
+            self._pages.cursor(snapshot, end)
+            if end < len(snapshot.conversation_ids) else None
+        )
+        if not candidates:
+            return {
+                "values": [], "next_cursor": next_cursor, "supported": True,
+                "checked_from": position + 1 if candidate_ids else 0,
+                "checked_to": end, "checked_count": len(candidate_ids),
+            }
+        matches = await self.runtime.search_scoped_thread_titles(
+            [candidate["thread_id"] for candidate in candidates], parsed.text,
+        )
+        if matches is None:
+            return {
+                "values": [], "next_cursor": None, "supported": False,
+                "checked_from": 0, "checked_to": 0, "checked_count": 0,
+            }
+        matching_anchors = [
+            candidate for candidate in candidates if candidate["thread_id"] in matches
+        ]
+        # Native names/snippets never leave this boundary. Re-resolve the
+        # matched ID/thread pairs locally, then emit only card-safe fields.
+        rows = self.store.native_title_search_cards(
+            matching_anchors, account_id=account_id, project_id=project_id,
+        )
+        values = [
+            {
+                "id": row["id"], "title": row["title"],
+                "project_id": row["project_id"], "activity_at": row["activity_at"],
+                "native_title_match": True,
+            }
+            for row in rows
+        ]
+        return {
+            "values": values, "next_cursor": next_cursor, "supported": True,
+            "checked_from": position + 1 if candidate_ids else 0,
+            "checked_to": end, "checked_count": len(candidate_ids),
+        }
 
     def _search_snapshot_page_values(
         self,

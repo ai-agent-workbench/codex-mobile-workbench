@@ -131,6 +131,33 @@ async function setup(context, theme) {
     await setup(context, 'dark');
     const page = await context.newPage();
     await page.goto(base + '/projects/history');
+    await search(page, '原生专属');
+    assert(await page.locator('.history-search-card').count() === 0, '补查未点击前不混入原生结果');
+    await page.locator('[data-native-title-button]').click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-native-title-match]').length === 2);
+    assert((await page.locator('[data-native-title-match]').first().getAttribute('href')).includes('/conversation/'), '补查未返回可打开的链接');
+    const nativePrefix = '/' + 'a'.repeat(40);
+    await page.goto(base + nativePrefix + '/project/fixture');
+    await search(page, '原生专属');
+    const answer = page.waitForResponse(r => r.url().includes('/conversations/search/native-titles?'));
+    await page.locator('[data-native-title-button]').click();
+    assert(new URL((await answer).url()).pathname.startsWith(nativePrefix + '/project/fixture/'), '补查越过项目路由或丢入口前缀');
+    await page.waitForFunction(() => document.querySelectorAll('[data-native-title-match]').length === 1);
+    assert((await page.locator('[data-native-title-match]').getAttribute('href')).endsWith('/conversation/search-000'), '项目补查越界');
+    // Delayed result from an earlier query cannot populate the new query.
+    let releaseNative, startedNative;
+    const oldStarted = new Promise(done => { startedNative = done; });
+    await page.route('**/conversations/search/native-titles?*', async route => {
+      const waiting = new Promise(done => { releaseNative = done; });
+      startedNative(); await waiting;
+      try { await route.continue(); } catch (_) {}
+    });
+    await page.locator('[data-native-title-button]').click(); await oldStarted;
+    await search(page, '提问专属 001'); releaseNative();
+    assert(await page.locator('.history-search-card').count() === 1, '取消原生补查破坏本地搜索');
+    assert(await page.locator('[data-native-title-match]').count() === 0, '旧补查响应污染新搜索');
+    await page.unroute('**/conversations/search/native-titles?*');
+    await page.goto(base + '/projects/history');
     const literalQuery = '\ufeff字面字符检索\ufeff';
     await search(page, literalQuery);
     assert(await page.locator('.history-search-card').count() === 1, '浏览器删除了字面的FEFF搜索字符');

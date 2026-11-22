@@ -87,7 +87,7 @@
 
 ## 现在到哪一步了
 
-这是 **Windows／WSL 技术预览**，当前版本为 **v0.1.0-preview.4**，固定 Codex 0.160.0 完整原生运行包。
+这是 **Windows／WSL 技术预览**，本分支对应 **v0.1.0-preview.5**，新安装使用固定 Codex 0.171.0 完整运行包；从 preview.4 分两步升级。新版本是否已经发行，以 Release 页面为准。
 
 已发布的是 **Windows 面板＋WSL 后端**，不是 Windows 原生后端。当初选择 WSL，是为了减少 Windows 命令引号、转义及路径兼容问题造成的返工；这是当时的工程取舍，不是 Windows 不能运行 Codex。Windows 原生版后续开发暂缓，尚未提供可安装的原生后端，见 [支持矩阵](docs/SUPPORT_MATRIX.md)。
 
@@ -96,6 +96,8 @@
 维护者已经验证独立实例的原生登录、可信 HTTPS、实体手机 Passkey 绑定、真实模型任务和文件下载；2026-10-28 的 preview.2 升级验收保留登录与绑定，实体手机再次完成任务、取得正确文件并返回原对话。另一台电脑、原生 Linux、完整切后台／断网场景和旧公开版数据导入，尚未完成本次实机验收。详见 [支持矩阵](docs/SUPPORT_MATRIX.md)。
 
 preview.4 增加可读的备份／恢复摘要及公开 CI 隔离演练：用合成数据核验真实认证、Web 进程重启后的重连、新目录恢复后的文件一致性与命令不重发，不冒充新一轮实体设备或真实模型验收。
+
+在历史或项目内搜索后，可点 **补查原生标题**：只检查这个工作台里本来能打开的已绑定对话，项目内不跨项目；原有全文搜索不变。见[升级步骤](docs/OPERATIONS.md#从-preview4-升级到-preview5)。
 
 这是个人高权限工具：新安装实例的每个账号在首次新建对话前，须明确选择 **只读**、**工作区可写**（推荐）或 **完全访问**；之后的新对话使用该账号默认值。原生任务可使用运行账户的系统权限。只连接自己的账号和设备；不要把它当作多人公共 AI 服务。[安全边界与私密漏洞报告](SECURITY.md) · [数据与费用](docs/PRIVACY_AND_COSTS.md)
 
@@ -203,7 +205,7 @@ The Windows panel currently uses Chinese labels. The English guides include thos
 
 ## Current status
 
-This is a **Windows/WSL technical preview**, currently **v0.1.0-preview.4**, using the complete pinned Codex 0.160.0 runtime kit.
+This is a **Windows/WSL technical preview**. This branch targets **v0.1.0-preview.5**. New installations use the complete pinned Codex 0.171.0 runtime kit; existing preview.4 instances upgrade in two stages. See Releases for the actual published package.
 
 The released setup is **a Windows panel with a WSL backend**, not a Windows-native backend. WSL was originally chosen to reduce rework caused by Windows command quoting, escaping, and path compatibility—not because Codex cannot run on Windows. Further work on a Windows-native release is paused; no installable Windows-native backend is offered. [Support matrix (中文)](docs/SUPPORT_MATRIX.md)
 
@@ -212,6 +214,8 @@ The installer offers three network choices: inherit the existing WSL configurati
 The maintainer has checked native sign-in, trusted HTTPS, physical-phone Passkey pairing, a real model task, and a file download on an independent instance. In the 2026-10-28 preview.2 check, sign-in and pairing were retained, and the phone completed another task, obtained the correct file, and returned to the original conversation. Another computer, native Linux, full background/disconnection scenarios, and old public-version data import have not completed this release's real-device checks. See the [support matrix (中文)](docs/SUPPORT_MATRIX.md).
 
 Preview.4 adds readable backup/restore summaries and an isolated recovery drill in CI. It checks real authentication, Web-process reconnection, file integrity after restoring to a new directory, and no command replay with synthetic data—not a new physical-device or real-model acceptance test.
+
+After searching history or a project, **补查原生标题** checks native title matches only for conversations already openable in this workbench, without going outside the project or replacing local full-text search. See [upgrade instructions](INSTALL.en.md#upgrading-from-preview4).
 
 This is a high-privilege personal tool. A newly installed instance asks each account to explicitly choose **Read-only**, **Workspace write** (recommended), or **Full Access** before its first new conversation; later new conversations use that account default. Native tasks can use the runtime account's system permissions. Connect only your own account and devices, not a public multi-user AI service. [Security and private vulnerability reporting (中文)](SECURITY.md) · [Data and costs (中文)](docs/PRIVACY_AND_COSTS.md)
 

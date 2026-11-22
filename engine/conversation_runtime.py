@@ -3174,6 +3174,15 @@ class ConversationRuntime:
             emit("conversation_runtime_client_ready", connection_epoch=getattr(self._client, "connection_epoch", None))
             return self._client
 
+    async def search_scoped_thread_titles(
+        self, thread_ids: list[str], search_term: str
+    ) -> set[str] | None:
+        """Read native title matches only for a server-supplied local batch."""
+        client = await self._ensure_client()
+        if not getattr(client, "supports_scoped_thread_title_search", False):
+            return None
+        return await client.search_scoped_thread_titles(thread_ids, search_term)
+
     async def _replace_client(self) -> Any:
         async with self._connection_lock:
             previous = self._client

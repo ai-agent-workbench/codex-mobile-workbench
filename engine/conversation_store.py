@@ -2020,6 +2020,109 @@ class ConversationStore:
             ).fetchall()
         return [self._decode_conversation(row) for row in rows]
 
+    def native_title_search_candidates(
+        self,
+        *,
+        account_id: str | None,
+        project_id: str | None | object = ...,
+        conversation_ids: list[str] | None = None,
+    ) -> list[dict[str, str]]:
+        """Return only locally openable, owner-bound native search anchors.
+
+        This is intentionally narrower than ordinary history listing: title
+        supplementation must never ask Native about ownerless, another-owner,
+        deleting, or out-of-project conversations.
+        """
+        account = account_id if isinstance(account_id, str) and 0 < len(account_id) <= 200 and account_id.strip() == account_id else None
+        if not account:
+            return []
+        clauses = [
+            "c.thread_id IS NOT NULL",
+            "c.owner_account_id = ?",
+            _NATIVE_DELETE_SETTLED_SQL,
+        ]
+        values: list[Any] = [account]
+        if project_id is not ...:
+            if project_id is None:
+                clauses.append("c.project_id IS NULL")
+            else:
+                clauses.append("c.project_id = ?")
+                values.append(project_id)
+        if conversation_ids is not None:
+            ids = list(dict.fromkeys(
+                value for value in conversation_ids
+                if isinstance(value, str) and _ID_RE.fullmatch(value)
+            ))
+            if not ids:
+                return []
+            clauses.append("c.id IN (" + ",".join("?" for _ in ids) + ")")
+            values.extend(ids)
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT c.id,c.thread_id FROM conversations c WHERE "
+                + " AND ".join(clauses)
+                + " ORDER BY c.activity_at DESC,c.id DESC",
+                values,
+            ).fetchall()
+        return [
+            {"id": str(row["id"]), "thread_id": str(row["thread_id"])}
+            for row in rows
+        ]
+
+    def native_title_search_cards(
+        self,
+        anchors: list[dict[str, str]],
+        *,
+        account_id: str | None,
+        project_id: str | None | object = ...,
+    ) -> list[dict[str, str | None]]:
+        """Reconfirm native-match anchors and return only established card data."""
+        account = account_id if isinstance(account_id, str) and 0 < len(account_id) <= 200 and account_id.strip() == account_id else None
+        if not account or len(anchors) > 100:
+            return []
+        pairs = list(dict.fromkeys(
+            (anchor.get("id"), anchor.get("thread_id"))
+            for anchor in anchors if isinstance(anchor, dict)
+            and isinstance(anchor.get("id"), str)
+            and isinstance(anchor.get("thread_id"), str)
+            and _ID_RE.fullmatch(anchor["id"])
+            and _ID_RE.fullmatch(anchor["thread_id"])
+        ))
+        if not pairs:
+            return []
+        clauses = [
+            "c.thread_id IS NOT NULL",
+            "c.owner_account_id = ?",
+            _NATIVE_DELETE_SETTLED_SQL,
+        ]
+        values: list[Any] = [account]
+        if project_id is not ...:
+            if project_id is None:
+                clauses.append("c.project_id IS NULL")
+            else:
+                clauses.append("c.project_id = ?")
+                values.append(project_id)
+        clauses.append(
+            "(" + " OR ".join("(c.id=? AND c.thread_id=?)" for _ in pairs) + ")"
+        )
+        for pair in pairs:
+            values.extend(pair)
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT c.id,c.thread_id,c.title,c.project_id,c.activity_at "
+                "FROM conversations c WHERE " + " AND ".join(clauses)
+                + " ORDER BY c.activity_at DESC,c.id DESC",
+                values,
+            ).fetchall()
+        return [
+            {
+                "id": str(row["id"]), "thread_id": str(row["thread_id"]),
+                "title": str(row["title"]), "project_id": row["project_id"],
+                "activity_at": str(row["activity_at"]),
+            }
+            for row in rows
+        ]
+
     def mark_read(self, conversation_id: str, account_id: str) -> None:
         self._validate_id(conversation_id, "conversation")
         account = str(account_id or "").strip()[:200]

@@ -10,6 +10,13 @@ from tests.store_fixtures import seeded_store
 
 
 class NoRuntime:
+    async def search_scoped_thread_titles(self, thread_ids, search_term):
+        # Two same-title locally bound rows, one in each project. The real
+        # routes and service choose the scope before this test-local peer.
+        if search_term == "原生专属":
+            return {"thread-search-000", "thread-outside"}.intersection(thread_ids)
+        return None
+
     def __getattr__(self, name):
         raise AssertionError("search fixture must not call runtime: " + name)
 
@@ -31,7 +38,8 @@ def search_fixture(count=45):
         settings = {"model": "fixture-model", "effort": "medium", "permission": "workspace-write", "service_tier": None}
 
         def add(cid, project, label, number, *, long=False):
-            store.create_conversation(cid, title=label, cwd=str(workspace), project_id=project, settings=settings)
+            store.create_conversation(cid, title=label, cwd=str(workspace), project_id=project, settings=settings,
+                                      owner_account_id="fixture-admin")
             store.bind_thread(cid, {"id": "thread-" + cid}, server_version="fixture")
             user = "共同关键词 提问专属 " + number
             final = "共同关键词 回答专属 " + number

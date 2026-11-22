@@ -208,5 +208,19 @@
     "extraction_record": "recorded locally in source fixture or sibling manifest",
     "changes": "Protocol summaries are selected/adapted by this project for compatibility tests; native schema copies retain their generated structure. Environment identity literals, where present, are normalized in this candidate.",
     "exact_version": "0.159.2"
+  },
+  {
+    "path": "engine/fixtures/codex_app_server_protocol_0_171_0.json",
+    "sha256": "6736ca55f0c997d0ef8c1f822271a7dcd03459b378bc066235d05cae8d24712c",
+    "upstream": "https://github.com/openai/codex",
+    "upstream_tag": "rust-v0.171.0",
+    "license": "Apache-2.0",
+    "license_file": "third_party/codex/0.171.0-LICENSE",
+    "notice_file": "third_party/codex/0.171.0-NOTICE",
+    "role": "protocol_summary",
+    "extraction_record": "Fixed official npm package and GitHub full Linux kit; codex and code-mode-host bytes match. Public and experimental schema generated with codex app-server generate-json-schema; the selected subset is adapted for compatibility.",
+    "exact_version": "0.171.0",
+    "stable_schema_sha256": "6207620bfd8e98a03a36330ed5e416b551086b91202f93a3759a937065bf2ca7",
+    "experimental_schema_sha256": "fe3f0cc67ec5f581743c802ee6e1369c32328d24f91faf4c6f5c697935db642c"
   }
 ]

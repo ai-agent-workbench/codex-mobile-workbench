@@ -29,7 +29,7 @@ from shared import runtime_bundle as bundle
 from shared import runtime_release as release
 from shared import instance_native as native
 
-NATIVE_VERSION = '0.160.0'
+NATIVE_VERSION = native.VERSION
 LEGACY_NATIVE_URL = 'https://github.com/openai/codex/releases/download/rust-v0.160.0/codex-x86_64-unknown-linux-musl.tar.gz'
 LEGACY_NATIVE_SIZE = 109304578
 LEGACY_NATIVE_ARCHIVE_SHA256 = '306865417d4ee7a927785852910a527f41e1e159add390ac5ae3accb67d44a13'
@@ -100,7 +100,7 @@ def native_command(config: dict) -> Path:
 
 
 def legacy_native_metadata() -> dict:
-    return {'version': NATIVE_VERSION, 'archive_sha256': LEGACY_NATIVE_ARCHIVE_SHA256,
+    return {'version': native.PREVIOUS_VERSION, 'archive_sha256': LEGACY_NATIVE_ARCHIVE_SHA256,
             'binary_sha256': NATIVE_BINARY_SHA256, 'source': LEGACY_NATIVE_URL}
 
 
@@ -198,10 +198,10 @@ def reconcile_native_transaction(config: dict) -> None:
             or not isinstance(value['operation'], str)
             or not re.fullmatch(r'[0-9a-f]{32}', value['operation'])
             or value['phase'] not in {'prepared', 'old_moved', 'new_moved'}
-            or value['new_native'] != native.metadata()
+            or not native.known_metadata(value['new_native'])
             or (value['old_native'] is not None
                 and not is_legacy_native_metadata(value['old_native'])
-                and value['old_native'] != native.metadata())
+                and not native.known_metadata(value['old_native']))
             or (value['installed_sha256'] is not None
                 and (not isinstance(value['installed_sha256'], str)
                      or not re.fullmatch(r'[0-9a-f]{64}', value['installed_sha256'])))):
@@ -269,22 +269,23 @@ def reconcile_native_transaction(config: dict) -> None:
     _clear_receipt(root)
 
 
-def install_native(config: dict) -> tuple[dict, Path | None]:
+def install_native(config: dict, *, version: str | None = None) -> tuple[dict, Path | None]:
     """Stage a complete kit; preserve any validated predecessor for install()."""
     root = Path(config['root'])
-    archive = root / 'codex-package-0.160.0-linux-x64.tar.gz'
+    pin = native.metadata(version)
+    archive = root / ('codex-package-' + pin['version'] + '-linux-x64.tar.gz')
     if archive.exists() or archive.is_symlink():
         cfg.private_file(archive, max_size=None)
-    if not archive.exists() or digest(archive) != native.ARCHIVE_SHA256 or archive.stat().st_size != native.ARCHIVE_SIZE:
+    if not archive.exists() or digest(archive) != pin['archive_sha256'] or archive.stat().st_size != pin['archive_size']:
         temporary = root / ('.download-' + uuid.uuid4().hex)
         try:
             env = instance_environment(config)
             network_command(['curl', '--disable', '--silent', '--show-error', '--fail', '--location', '--proto', '=https',
-                '--proto-redir', '=https', '--tlsv1.2', '--max-time', '900', '--output', str(temporary), native.URL],
+                '--proto-redir', '=https', '--tlsv1.2', '--max-time', '900', '--output', str(temporary), pin['source']],
                 env=env, timeout=930, mode=config['settings']['network_mode'],
                 phase='原生程序下载', code='native_download_failed')
             temporary.chmod(0o600)
-            if temporary.stat().st_size != native.ARCHIVE_SIZE or digest(temporary) != native.ARCHIVE_SHA256:
+            if temporary.stat().st_size != pin['archive_size'] or digest(temporary) != pin['archive_sha256']:
                 raise cfg.InstanceError('官方固定版本的文件大小或校验值不匹配，未运行。', 'native_digest_mismatch')
             os.replace(temporary, archive)
         finally:
@@ -295,10 +296,10 @@ def install_native(config: dict) -> tuple[dict, Path | None]:
     moved_previous = False
     try:
         stage.mkdir(mode=0o700)
-        native.unpack(archive, stage)
+        native.unpack(archive, stage, pin)
         native.add_license(stage, Path(__file__).resolve().parents[1] / 'desktop/licenses/codex-Apache-2.0.txt')
-        native.verify(stage, native.metadata())
-        if command([str(stage / 'bin/codex'), '--version'], env=instance_environment(config)).strip() != 'codex-cli ' + NATIVE_VERSION:
+        native.verify(stage, pin)
+        if command([str(stage / 'bin/codex'), '--version'], env=instance_environment(config)).strip() != 'codex-cli ' + pin['version']:
             raise cfg.InstanceError('原生程序版本不符，未激活。', 'native_version_mismatch')
         old_metadata = None
         installed_path = root / 'installed.json'
@@ -317,15 +318,15 @@ def install_native(config: dict) -> tuple[dict, Path | None]:
             if old_metadata is None:
                 # An exact full kit is safe to retain even if a prior first
                 # install stopped before creating its installation metadata.
-                native.verify(target, native.metadata())
-                old_metadata = native.metadata()
+                native.verify(target, pin)
+                old_metadata = pin
             else:
                 _verify_previous_native(target, old_metadata)
         elif old_metadata is not None:
             _pending_native()
         _sync_tree(stage)
         receipt = {'format_version': 1, 'operation': uuid.uuid4().hex, 'installed_sha256': _installed_bytes(root),
-                   'old_native': old_metadata, 'new_native': native.metadata(), 'previous': previous.name,
+                   'old_native': old_metadata, 'new_native': pin, 'previous': previous.name,
                    'stage': stage.name, 'phase': 'prepared'}
         _write_receipt(root, receipt)
         if had_target:
@@ -338,8 +339,8 @@ def install_native(config: dict) -> tuple[dict, Path | None]:
         os.replace(stage, target)
         _sync_directory(root)
         _write_receipt(root, {**receipt, 'phase': 'new_moved'})
-        native.verify(target, native.metadata())
-        return native.metadata(), (previous if moved_previous else None)
+        native.verify(target, pin)
+        return pin, (previous if moved_previous else None)
     except BaseException:
         # The same persistent path handles exceptions and restarts. Unknown
         # objects preserve the receipt instead of being recursively deleted.
@@ -597,6 +598,31 @@ def bootstrap_account(config: dict) -> None:
     # No TOTP enable marker, legacy secret or anonymous /setup is created.
 
 
+_UPGRADE_FIXTURE = 'engine/fixtures/codex_app_server_protocol_0_171_0.json'
+_UPGRADE_FIXTURE_SHA256 = '6736ca55f0c997d0ef8c1f822271a7dcd03459b378bc066235d05cae8d24712c'
+
+
+def supports_promoted_native(releases: Path, stamp: str) -> bool:
+    """Read declarations only from a verified immutable Web release.
+
+    The old fallback cannot use the new native socket. The exact public ABI
+    fixture is included only by releases that negotiate this pinned kit.
+    """
+    if release._status(releases, stamp) != 'healthy':
+        return False
+    release._verify_release(releases, stamp, trusted_base_interpreter=HOST_PYTHON)
+    fixture = releases / stamp / 'runtime/app' / _UPGRADE_FIXTURE
+    return fixture.is_file() and digest(fixture) == _UPGRADE_FIXTURE_SHA256
+
+
+def native_upgrade_target(releases: Path, previous: str | None, installed: dict | None) -> str:
+    if previous is None or supports_promoted_native(releases, previous):
+        return native.VERSION
+    if installed and installed['native'].get('version') == native.PREVIOUS_VERSION:
+        return native.PREVIOUS_VERSION
+    raise cfg.InstanceError('当前健康回退程序不支持已安装的原生版本，未切换。', 'incompatible_native_fallback')
+
+
 def install(config: dict, source: Path) -> dict:
     if sys.version_info[:2] != (3, 12) or platform.machine() != 'x86_64':
         raise cfg.InstanceError('首版需要 Ubuntu 24.04 的 Python 3.12 / x86-64 环境。', 'unsupported_platform')
@@ -616,10 +642,14 @@ def install(config: dict, source: Path) -> dict:
         # exists for this first activation, so retain it as failed, not healthy.
         release.withdraw_initial_runtime(releases, pending[0])
     previous = release._current_stamp(releases)
+    installed = software(config, verify=False) if previous else None
+    if installed is not None and installed['release'] != previous:
+        raise cfg.InstanceError('上次安装尚未通过启动验证，请先启动并核对结果；未覆盖待验安装。', 'pending_runtime')
+    version = native_upgrade_target(releases, previous, installed)
     if previous:
         # A stopped coherent data + runtime backup precedes any upgrade.
         from shared.instance_recovery import backup
-        backup(config, legacy_native=is_legacy_native_metadata(software(config, verify=False)['native']))
+        backup(config, legacy_native=is_legacy_native_metadata(installed['native']))
     build = root / 'build'
     build.mkdir(mode=0o700, exist_ok=True)
     stage = build / uuid.uuid4().hex
@@ -636,7 +666,18 @@ def install(config: dict, source: Path) -> dict:
         phase='依赖下载', code='dependency_download_failed')
     command([str(python), '-I', str(stage / 'source/scripts/check-core-deps.py')], env=env)
     command([str(python), '-I', '-m', 'pip', '--isolated', 'check'], env=pip_env)
-    native_metadata, native_previous = install_native(config)
+    # Phase one for preview.4: keep the already verified complete kit.
+    # Phase two has at least one known healthy Web fallback that also
+    # negotiates the promoted native version; no code can accidentally
+    # acquire a fallback that is known to reject the active socket.
+    keep_native = bool(installed and installed['native'] == native.metadata(version))
+    if keep_native:
+        native.verify(root / 'native', installed['native'])
+        native_metadata, native_previous = installed['native'], None
+    elif version == native.VERSION:
+        native_metadata, native_previous = install_native(config)
+    else:
+        native_metadata, native_previous = install_native(config, version=version)
     try:
         controller, hashes = install_controller(stage / 'source', root)
         stamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
@@ -660,7 +701,9 @@ def install(config: dict, source: Path) -> dict:
             pass
         raise
     commit_native_transaction(native_previous)
-    result = {'release': stamp, 'native_version': NATIVE_VERSION, 'note': '软件已安装，未自动启动或登录；还需配置手机 HTTPS 入口并由本人完成原生登录。'}
+    result = {'release': stamp, 'native_version': native_metadata['version'], 'note': '软件已安装，未自动启动或登录；还需配置手机 HTTPS 入口并由本人完成原生登录。'}
+    if version != native.VERSION:
+        result['note'] += ' 已保留原生 0.160.0 作为过渡。请先启动并确认健康，再停止并从本安装包执行一次安装以启用 0.171.0。'
     if native_previous is not None:
         result['retained_native'] = str(native_previous)
         result['note'] += ' 此前原生目录已原样保留，未自动清理。'
@@ -689,6 +732,9 @@ def start(config: dict) -> dict:
     if selected != installed['release']:
         if release._pending(releases) is not None:
             raise cfg.InstanceError('存在未决版本事务，未覆盖。', 'pending_runtime')
+        if (selected and installed['native']['version'] == native.VERSION
+                and not supports_promoted_native(releases, selected)):
+            raise cfg.InstanceError('上一个 Web 版本不支持当前原生版本，未启动或切换。', 'incompatible_native_fallback')
         release.write_runtime_pending(releases, installed['release'], selected)
         release.handoff_runtime(releases, installed['release'])
     # New config values become effective only on an explicit lifecycle action.

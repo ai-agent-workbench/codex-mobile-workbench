@@ -105,14 +105,26 @@ class ManagerContractTests(unittest.TestCase):
 
     def test_pinned_full_native_manifest_includes_host_and_licensing_resources(self):
         members = {name for name, _, _, _ in native.MEMBERS}
-        self.assertEqual(native.VERSION, '0.160.0')
-        self.assertEqual(native.ARCHIVE_SHA256, '4fcc47ab57f52ff75363951a8761146cd10c8288bd86fed45487dbb204a16b71')
-        self.assertTrue({'bin/codex', 'bin/codex-code-mode-host', 'codex-path/rg',
+        self.assertEqual(native.VERSION, '0.171.0')
+        self.assertEqual(native.ARCHIVE_SHA256, '8391d67757496bfd14893eca6cbf0c96994bf2627566ff1f018f70600c9ef6b3')
+        self.assertTrue({'bin/codex', 'bin/codex-code-mode-host', 'bin/codex-exec-server', 'codex-path/rg',
                          'codex-resources/voice/NOTICE.md',
                          'codex-resources/voice/licenses/LGPL-2.1.txt'} <= members)
         self.assertTrue({'bin/codex', 'bin/codex-code-mode-host'} <= native.EXECUTABLES)
         self.assertNotIn('codex-package.json', native.EXECUTABLES)
         self.assertEqual(native.metadata()['manifest_sha256'], native.manifest_identity())
+
+    def test_upgrade_requires_healthy_compatible_web_before_promoting_previous_kit(self):
+        releases = self.root / 'state/releases'
+        old_native = {'release': OLD, 'native': native.metadata(native.PREVIOUS_VERSION)}
+        new_native = {'release': OLD, 'native': native.metadata()}
+        self.assertEqual(runtime.native_upgrade_target(releases, None, None), native.VERSION)
+        with mock.patch.object(runtime, 'supports_promoted_native', return_value=False):
+            self.assertEqual(runtime.native_upgrade_target(releases, OLD, old_native), native.PREVIOUS_VERSION)
+            with self.assertRaisesRegex(cfg.InstanceError, '不支持'):
+                runtime.native_upgrade_target(releases, OLD, new_native)
+        with mock.patch.object(runtime, 'supports_promoted_native', return_value=True):
+            self.assertEqual(runtime.native_upgrade_target(releases, OLD, old_native), native.VERSION)
 
     def test_native_unpack_rejects_duplicate_extra_and_link_members(self):
         contents = b'fixture codex'
@@ -144,7 +156,7 @@ class ManagerContractTests(unittest.TestCase):
         target = self.root / 'native'
         target.mkdir(mode=0o700)
         old = target / 'keep-unknown'; old.write_bytes(b'preserve this exact tree'); old.chmod(0o600)
-        archive = self.root / 'codex-package-0.160.0-linux-x64.tar.gz'
+        archive = self.root / f'codex-package-{native.VERSION}-linux-x64.tar.gz'
         archive.write_bytes(b'fixture archive'); archive.chmod(0o600)
         with mock.patch.object(native, 'ARCHIVE_SIZE', archive.stat().st_size), \
                 mock.patch.object(native, 'ARCHIVE_SHA256', runtime.digest(archive)), \
@@ -311,6 +323,9 @@ class IsolatedRecoveryTests(unittest.TestCase):
             target = source / origin
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(SOURCE / origin, target)
+        protocol_target = source / runtime._UPGRADE_FIXTURE
+        protocol_target.parent.mkdir(parents=True)
+        shutil.copyfile(SOURCE / runtime._UPGRADE_FIXTURE, protocol_target)
         (source / 'app.py').write_text('# inert isolated software fixture\n')
         (source / '.gitignore').write_text('.venv/\n')
         env = {**os.environ, 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null'}
@@ -329,7 +344,7 @@ class IsolatedRecoveryTests(unittest.TestCase):
         # Tiny complete bundle fixture: all production pins remain in the source
         # module; only this process replaces them with a checked miniature kit.
         fixture_files = {
-            'bin/codex': b'#!/bin/sh\necho codex-cli 0.160.0\n',
+            'bin/codex': f'#!/bin/sh\necho codex-cli {native.VERSION}\n'.encode(),
             'bin/codex-code-mode-host': b'#!/bin/sh\nexit 0\n',
             'codex-package.json': b'{}\n',
             'codex-resources/NOTICE.md': b'fixture notice\n',
@@ -596,6 +611,23 @@ class IsolatedRecoveryTests(unittest.TestCase):
         self.assertEqual(release._read_meta(releases, NEW)['previous'], OLD)
         self.assertEqual(release._read_meta(backup / 'releases', NEW)['previous'], OLD)
         self.assertTrue(json.loads((target / 'restore-report.json').read_text())['runtime_lineage_truncated'])
+
+    def test_incompatible_web_rollback_never_selects_old_runtime_under_promoted_native(self):
+        self.prepare()
+        root = self.root / 'state/releases'
+        with mock.patch.object(recovery, 'unit_status', return_value='inactive'), \
+                mock.patch.object(recovery.release, '_read_meta', return_value={'previous':'20260101-000000','commit':'a'*40}), \
+                mock.patch.object(runtime, 'software', return_value={
+                    'native': native.metadata(), 'release': OLD
+                }), \
+                mock.patch.object(runtime, 'supports_promoted_native', return_value=False) as check, \
+                mock.patch.object(recovery, 'backup') as backup, \
+                mock.patch.object(recovery.release, 'select_healthy_runtime') as select, \
+                self.assertRaises(cfg.InstanceError) as raised:
+            recovery.rollback(self.config)
+        self.assertEqual(raised.exception.code,'incompatible_native_fallback')
+        check.assert_called_once_with(root,'20260101-000000')
+        backup.assert_not_called(); select.assert_not_called()
 
     def test_native_transaction_rollback_restores_predecessor_after_later_failure(self):
         self.prepare()

@@ -16,7 +16,7 @@ from shared.html_lib import html, management_script, nav, static_url
 from shared.conversation_pagination import ConversationPageCursorError
 from shared.security import audit, logged_in, require_auth
 from engine.conversation_search import ConversationSearchQueryError
-from shared.history_search import initial_search, search_cards, search_controls
+from shared.history_search import initial_search, native_title_cards, search_cards, search_controls
 from shared.permission_choice import pending as permission_choice_pending
 from routes.dot_conversations import dot_available
 
@@ -139,7 +139,7 @@ def history(request: Request, q: str = "", search_cursor: str | None = None):
         + search_controls(
             HISTORY_PATH, HISTORY_PATH + "/search", q, search_page,
             error=search_error, project_names=project_names, show_project=True,
-            compact=True,
+            compact=True, native_title_endpoint=HISTORY_PATH + "/search/native-titles",
         )
         + "<div data-history-browse" + (" hidden" if q.strip() else "") + ">"
         + dot_entry
@@ -196,6 +196,49 @@ def history_search(request: Request, q: str = "", cursor: str | None = None):
     return JSONResponse({
         "html": search_cards(page["values"], project_names=project_names, show_project=True),
         "next_cursor": page["next_cursor"],
+    }, headers={"Cache-Control": "private, no-store"})
+
+
+@router.get("/history/search/native-titles")
+@router.get("/projects/history/search/native-titles")
+async def history_native_title_search(
+    request: Request, q: str = "", cursor: str | None = None,
+):
+    redirect = require_auth(request)
+    if redirect:
+        return JSONResponse(
+            {"error": "登录已失效，请重新登录。", "code": "auth_required"},
+            status_code=401, headers={"Cache-Control": "no-store"},
+        )
+    try:
+        page = await conversation_service().native_title_search_public_page(
+            q, account_id=logged_in(request), cursor=cursor,
+        )
+    except (ConversationSearchQueryError, ConversationPageCursorError) as error:
+        return JSONResponse(
+            {"error": str(error), "code": error.code},
+            status_code=400 if isinstance(error, ConversationSearchQueryError) else 409,
+            headers={"Cache-Control": "no-store"},
+        )
+    except AppServerError:
+        return JSONResponse(
+            {"error": "原生标题补查暂时不可用；本地搜索结果未受影响。", "code": "native_title_unavailable"},
+            status_code=503, headers={"Cache-Control": "no-store"},
+        )
+    import projects
+    project_names = {
+        str(project.get("id") or ""): str(project.get("name") or "项目对话")
+        for project in projects.recent()
+    }
+    return JSONResponse({
+        "html": native_title_cards(
+            page["values"], project_names=project_names, show_project=True,
+        ),
+        "next_cursor": page["next_cursor"],
+        "supported": page["supported"],
+        "checked_from": page["checked_from"],
+        "checked_to": page["checked_to"],
+        "checked_count": page["checked_count"],
     }, headers={"Cache-Control": "private, no-store"})
 
 

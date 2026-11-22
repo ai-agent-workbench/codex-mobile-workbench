@@ -45,6 +45,7 @@ PROTOCOL_FIXTURE_0_159_2 = (
 PROTOCOL_FIXTURE_0_160_0 = (
     _FIXTURE_DIR / "codex_app_server_protocol_0_160_0.json"
 )
+PROTOCOL_FIXTURE_0_171_0 = (_FIXTURE_DIR / "codex_app_server_protocol_0_171_0.json")
 PROTOCOL_FIXTURES = (
     PROTOCOL_FIXTURE_0_151,
     PROTOCOL_FIXTURE_0_152_1,
@@ -53,11 +54,12 @@ PROTOCOL_FIXTURES = (
     PROTOCOL_FIXTURE_0_156_0,
     PROTOCOL_FIXTURE_0_159_2,
     PROTOCOL_FIXTURE_0_160_0,
+    PROTOCOL_FIXTURE_0_171_0,
 )
 # The newest validated fixture is the public default, while the client keeps
 # the previous fixture available so App Server runtime promotion and rollback
 # do not require an unsafe lock-step Web deployment.
-PROTOCOL_FIXTURE = PROTOCOL_FIXTURE_0_160_0
+PROTOCOL_FIXTURE = PROTOCOL_FIXTURE_0_171_0
 
 
 class AppServerError(RuntimeError):
@@ -1069,6 +1071,50 @@ class CodexAppServerClient:
         self._validate_rpc_id(item_id, "item")
         if predecessor_id is not None:
             self._validate_rpc_id(predecessor_id, "item")
+        exact_schema = self._fixture.get("methods", {}).get("thread/items/read")
+        if isinstance(exact_schema, dict):
+            # 0.171 can retrieve a persisted item directly. Unlike the legacy
+            # pagination anchor, this remains exact when a real notification
+            # has no known predecessor (for example, a later file change or
+            # successful command/MCP item in an already-running turn).
+            result = await self.request("thread/items/read", {
+                "threadId": thread_id,
+                "turnId": turn_id,
+                "itemIds": [item_id],
+            })
+            self._require_fields(
+                result, exact_schema["responseRequired"], "thread/items/read result"
+            )
+            data = result["data"]
+            if not isinstance(data, list) or len(data) != 1:
+                raise AppServerProtocolError(
+                    "thread/items/read did not return exactly requested item"
+                )
+            entry = data[0]
+            self._require_fields(
+                entry, exact_schema["entryRequired"], "thread/items/read entry"
+            )
+            if entry.get("turnId") != turn_id:
+                raise AppServerProtocolError(
+                    "thread/items/read returned an item for another turn"
+                )
+            item = entry["item"]
+            if not isinstance(item, dict) or item.get("id") != item_id:
+                raise AppServerProtocolError(
+                    "thread/items/read did not return requested item"
+                )
+            if not isinstance(item.get("type"), str) or not item["type"]:
+                raise AppServerProtocolError("thread/items/read item type is invalid")
+            output_deferred = entry.get("outputDeferred")
+            if output_deferred is not None and type(output_deferred) is not bool:
+                raise AppServerProtocolError(
+                    "thread/items/read outputDeferred must be a boolean"
+                )
+            if output_deferred:
+                raise AppServerProtocolError(
+                    "thread/items/read did not return complete item output"
+                )
+            return item
         if not self._fixture.get("itemPagination"):
             snapshot = await self.read_thread(thread_id, include_turns=True)
             turns = snapshot["thread"].get("turns")
@@ -1493,6 +1539,84 @@ class CodexAppServerClient:
                     "thread/list exceeded the page limit"
                 )
         return False
+
+    @property
+    def supports_scoped_thread_title_search(self) -> bool:
+        """Whether this fixture can search a server-owned allow-list only."""
+        method = self._fixture.get("methods", {}).get("thread/list")
+        required = {
+            "currentAccountOnly", "includedThreadIds", "searchTerm",
+            "useStateDbOnly",
+        }
+        return isinstance(method, dict) and required.issubset(method.get("params", []))
+
+    async def search_scoped_thread_titles(
+        self, thread_ids: list[str], search_term: str
+    ) -> set[str]:
+        """Search native titles strictly within one locally-owned ID batch."""
+        if not self.supports_scoped_thread_title_search:
+            raise AppServerProtocolError("scoped native title search is unsupported")
+        if not isinstance(search_term, str) or not search_term.strip():
+            raise AppServerProtocolError("native title search term is invalid")
+        if not isinstance(thread_ids, list) or not all(
+            isinstance(thread_id, str) for thread_id in thread_ids
+        ):
+            raise AppServerProtocolError("native title search thread batch is invalid")
+        allowed = list(dict.fromkeys(thread_ids))
+        if not allowed or len(allowed) > 100:
+            raise AppServerProtocolError("native title search thread batch is invalid")
+        for thread_id in allowed:
+            self._validate_rpc_id(thread_id, "thread")
+        schema = self._fixture["methods"]["thread/list"]
+        allowed_set = set(allowed)
+        matched: set[str] = set()
+        # An omitted archive filter excludes archived native threads even if
+        # the existing local conversation still opens. Scope both partitions
+        # identically; one overall deadline covers all pages on the socket.
+        try:
+            async with asyncio.timeout(10):
+                for archived in (False, True):
+                    seen_cursors: set[str] = set()
+                    cursor: str | None = None
+                    for _ in range(_MAX_THREAD_PAGES):
+                        params: dict[str, Any] = {
+                            "archived": archived,
+                            "includedThreadIds": allowed,
+                            "currentAccountOnly": True,
+                            "useStateDbOnly": True,
+                            "searchTerm": search_term,
+                            "limit": 100,
+                            "sortDirection": "asc",
+                        }
+                        if cursor is not None:
+                            params["cursor"] = cursor
+                        result = await self.request("thread/list", params)
+                        self._require_fields(result, schema["responseRequired"], "thread/list result")
+                        data = result["data"]
+                        if not isinstance(data, list):
+                            raise AppServerProtocolError("thread/list data must be a list")
+                        for thread in data:
+                            self._require_fields(thread, schema["entryRequired"], "thread/list entry")
+                            thread_id = thread["id"]
+                            self._validate_rpc_id(thread_id, "listed thread")
+                            if thread_id not in allowed_set:
+                                raise AppServerProtocolError(
+                                    "thread/list returned a thread outside the allowed set"
+                                )
+                            if thread_id in matched:
+                                raise AppServerProtocolError("thread/list repeated a thread")
+                            matched.add(thread_id)
+                        cursor = self._next_unique_cursor(
+                            result.get(schema["paginationField"]), seen_cursors, "thread/list"
+                        )
+                        if cursor is None:
+                            break
+                    else:
+                        raise AppServerProtocolError("thread/list pagination exceeded limit")
+        except TimeoutError as error:
+            raise AppServerError("scoped native title search timed out") from error
+        return matched
+
 
     @property
     def supports_conversation_tree_stop(self) -> bool:

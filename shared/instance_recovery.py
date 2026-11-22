@@ -136,7 +136,7 @@ def backup(config, *, legacy_native=False):
                 shutil.copyfile(license_source, destination / 'native/LICENSE.txt')
                 (destination / 'native/LICENSE.txt').chmod(0o600)
         else:
-            native.copy_bundle(root / 'native', destination / 'native')
+            native.copy_bundle(root / 'native', destination / 'native', installed['native'])
         cfg.write_json(destination / 'backup.json', {'format_version': 2,
             'created_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), 'profile': config,
             'installation': installed, 'selected': selected, 'versions': versions,
@@ -308,7 +308,7 @@ def restore(config, payload):
                         container.chmod(mode)
                     lineage_truncated = True
                 release.select_healthy_runtime(releases, value['selected'], trusted_base_interpreter=runtime.HOST_PYTHON)
-                native.copy_bundle(source / 'native', target / 'native')
+                native.copy_bundle(source / 'native', target / 'native', value['installation']['native'])
                 installation = {**value['installation'], 'release': value['selected'],
                                 'runtime_commit': release._read_meta(releases, value['selected'])['commit'],
                                 'controller': controller, 'controller_sha256': hashes, 'unit_sha256': {}}
@@ -345,6 +345,9 @@ def rollback(config):
     previous = release._read_meta(releases, selected)['previous']
     if not previous:
         raise cfg.InstanceError('这是首个健康版本，没有更早的本实例恢复点。', 'no_healthy_fallback')
+    if (installed['native']['version'] == native.VERSION
+            and not runtime.supports_promoted_native(releases, previous)):
+        raise cfg.InstanceError('旧 Web 不支持当前原生版本；已保留数据和版本，请用升级前备份恢复到独立目录。', 'incompatible_native_fallback')
     backup(config)
     release.select_healthy_runtime(releases, previous, trusted_base_interpreter=runtime.HOST_PYTHON)
     installed['release'] = previous

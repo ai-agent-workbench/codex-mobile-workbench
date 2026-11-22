@@ -27,6 +27,7 @@ CONTRACT_FILES = ('shared/maintenance_admission.py', 'engine/conversation_store.
     'engine/conversation_actions.py', 'engine/conversation_automation.py',
     'shared/message_attachments.py', 'routes/maintenance_admission.py', 'app.py',
     'engine/codex_app_server.py', 'engine/fixtures/codex_app_server_protocol_0_160_0.json',
+    'engine/fixtures/codex_app_server_protocol_0_171_0.json',
     'shared/maintenance_native.py', 'shared/instance_primitives.py')
 IMPLEMENTATION_SHA256 = hashlib.sha256(json.dumps({name: hashlib.sha256(
     (Path(__file__).resolve().parents[1] / name).read_bytes()).hexdigest()

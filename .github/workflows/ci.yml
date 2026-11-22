@@ -28,7 +28,7 @@ jobs:
         run: CODEX_WEB_PYTHON="$RUNNER_TEMP/test-venv/bin/python" bash scripts/run_tests.sh
 
   ui-offline:
-    name: Offline UI core, settings and recovery checks
+    name: Offline UI core, settings, history and recovery checks
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -57,7 +57,7 @@ jobs:
           CODEX_WEB_NODE: node
           NODE_PATH: ${{ github.workspace }}/ci/node_modules
           PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
-        run: env -u CODEX_SETTINGS_GATEWAY bash scripts/run_tests.sh ui core settings recovery
+        run: env -u CODEX_SETTINGS_GATEWAY bash scripts/run_tests.sh ui core settings history recovery
 
   desktop-panel:
     name: Windows desktop panel self-test

@@ -97,9 +97,32 @@ def search_cards(values: list[dict], *, project_names=None, show_project=False) 
     return "".join(cards)
 
 
+def native_title_cards(values: list[dict], *, project_names=None, show_project=False) -> str:
+    """Render only local card fields for a native-title match."""
+    project_names = project_names or {}
+    cards = []
+    for value in values:
+        conversation_id = str(value.get("id") or "")
+        if not _ID.fullmatch(conversation_id) or value.get("native_title_match") is not True:
+            continue
+        path = "/conversation/" + quote(conversation_id, safe="._:-")
+        meta = ["原生标题命中", _time(value.get("activity_at"))]
+        if show_project:
+            project_id = value.get("project_id")
+            meta.insert(0, project_names.get(project_id, "项目对话") if project_id else "临时对话")
+        cards.append(
+            "<a class='card history-search-card history-native-title-card' href='"
+            + html.escape(path, quote=True) + "' data-native-title-match='true'>"
+            + "<b>" + html.escape(str(value.get("title") or "新对话")) + "</b>"
+            + "<small>" + html.escape(" · ".join(part for part in meta if part)) + "</small>"
+            + "</a>"
+        )
+    return "".join(cards)
+
+
 def search_controls(action: str, endpoint: str, query: str, page: dict, *,
                     error="", project_names=None, show_project=False,
-                    compact=False) -> str:
+                    compact=False, native_title_endpoint: str | None = None) -> str:
     active = bool(query.strip())
     try:
         # Use the same query that produced the results and bound the cursor.
@@ -155,5 +178,17 @@ def search_controls(action: str, endpoint: str, query: str, page: dict, *,
         + html.escape(action + "?" + urlencode({"q": query, "search_cursor": cursor}), quote=True)
         + "' data-cursor='"
         + html.escape(cursor, quote=True) + "'" + ("" if cursor else " hidden")
-        + ">加载更多</a></div></div>"
+        + ">加载更多</a>"
+        + (
+            "<section class='history-native-title' data-native-title-search"
+            + ("" if active else " hidden")
+            + " data-native-title-endpoint='" + html.escape(native_title_endpoint, quote=True) + "'>"
+            "<button type='button' class='secondary' data-native-title-button>补查原生标题</button>"
+            "<p data-native-title-status role='status' aria-live='polite'></p>"
+            "<div class='history-search-results' data-native-title-results></div>"
+            "<button type='button' class='button secondary history-search-more'"
+            " data-native-title-more hidden>继续补查</button></section>"
+            if native_title_endpoint else ""
+        )
+        + "</div></div>"
     )

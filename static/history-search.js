@@ -20,6 +20,13 @@
   var toggle = root.querySelector('[data-search-toggle]');
   var browsePages = 1;
   var searchPages = 1;
+  var nativeTitle = root.querySelector('[data-native-title-search]');
+  var nativeTitleButton = root.querySelector('[data-native-title-button]');
+  var nativeTitleStatus = root.querySelector('[data-native-title-status]');
+  var nativeTitleResults = root.querySelector('[data-native-title-results]');
+  var nativeTitleMore = root.querySelector('[data-native-title-more]');
+  var nativeTitleController = null;
+  var nativeTitleGeneration = 0;
   var browseScroll = 0;
   var restoring = false;
   var restoreGeneration = 0;
@@ -125,6 +132,99 @@
     return count ? '已显示 ' + count + ' 条匹配对话' : '没有找到匹配的对话';
   }
 
+  function resetNativeTitle(query) {
+    nativeTitleGeneration += 1;
+    if (nativeTitleController) nativeTitleController.abort();
+    nativeTitleController = null;
+    if (!nativeTitle) return;
+    nativeTitle.hidden = !query;
+    nativeTitleButton.disabled = false;
+    nativeTitleResults.replaceChildren();
+    nativeTitleMore.hidden = true;
+    nativeTitleMore.dataset.cursor = '';
+    nativeTitleStatus.textContent = '';
+  }
+
+  function nativeTitleStatusText(payload, count) {
+    if (!payload.supported) return '当前原生版本不支持标题补查；本地搜索结果未受影响。';
+    var from = Number(payload.checked_from);
+    var to = Number(payload.checked_to);
+    var checked = Number(payload.checked_count);
+    if (!Number.isInteger(from) || !Number.isInteger(to) || !Number.isInteger(checked) ||
+        from < 0 || to < 0 || checked < 0 || (from && to < from)) {
+      throw new Error('原生标题补查返回格式不完整。');
+    }
+    if (!checked) return '没有可补查的已打开对话。';
+    return '已补查第 ' + from + '–' + to + ' 个已打开对话；本批命中 ' + count + ' 条。';
+  }
+
+  function runNativeTitle(append) {
+    if (!nativeTitle || !currentQuery || nativeTitleButton.disabled) return;
+    if (nativeTitleController) nativeTitleController.abort();
+    nativeTitleGeneration += 1;
+    var ticket = nativeTitleGeneration;
+    nativeTitleButton.disabled = true;
+    nativeTitleMore.disabled = true;
+    nativeTitleStatus.textContent = append ? '正在继续补查原生标题…' : '正在补查原生标题…';
+    var url = new URL(route(nativeTitle.dataset.nativeTitleEndpoint), location.origin);
+    url.searchParams.set('q', currentQuery);
+    if (append && nativeTitleMore.dataset.cursor) url.searchParams.set('cursor', nativeTitleMore.dataset.cursor);
+    nativeTitleController = new AbortController();
+    var requestController = nativeTitleController;
+    var timedOut = false;
+    var timeout = setTimeout(function () {
+      timedOut = true;
+      requestController.abort();
+    }, 15000);
+    return fetch(url.href, {
+      credentials: 'same-origin', cache: 'no-store', headers: {'Accept': 'application/json'},
+      signal: requestController.signal
+    }).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (payload) {
+        if (!response.ok) {
+          var error = new Error(payload.error || '原生标题补查失败，请重试。');
+          error.code = payload.code;
+          throw error;
+        }
+        return payload;
+      });
+    }).then(function (payload) {
+      if (ticket !== nativeTitleGeneration) return;
+      if (typeof payload.html !== 'string' || typeof payload.supported !== 'boolean') {
+        throw new Error('原生标题补查返回格式不完整。');
+      }
+      var template = document.createElement('template');
+      template.innerHTML = payload.html;
+      template.content.querySelectorAll('a[href^="/"]').forEach(function (link) {
+        link.setAttribute('href', route(link.getAttribute('href')));
+      });
+      if (!append) nativeTitleResults.replaceChildren();
+      nativeTitleResults.appendChild(template.content);
+      nativeTitleMore.dataset.cursor = typeof payload.next_cursor === 'string' ? payload.next_cursor : '';
+      nativeTitleMore.hidden = !payload.supported || !nativeTitleMore.dataset.cursor;
+      nativeTitleStatus.textContent = nativeTitleStatusText(
+        payload, nativeTitleResults.querySelectorAll('.history-native-title-card').length
+      );
+    }).catch(function (error) {
+      if (ticket !== nativeTitleGeneration) return;
+      if (error.name === 'AbortError' && !timedOut) return;
+      if (error.name === 'AbortError' && timedOut) {
+        nativeTitleStatus.textContent = '原生标题补查超时，请重试；本地搜索结果未受影响。';
+        nativeTitleMore.hidden = true;
+        return;
+      }
+      nativeTitleStatus.textContent = error.code === 'cursor_invalid' || error.code === 'cursor_expired'
+        ? '补查范围已过期，请重新补查。' : '原生标题补查失败；本地搜索结果未受影响。';
+      nativeTitleMore.hidden = true;
+    }).finally(function () {
+      clearTimeout(timeout);
+      if (ticket !== nativeTitleGeneration) return;
+      nativeTitleController = null;
+      nativeTitleButton.disabled = false;
+      nativeTitleMore.disabled = false;
+    });
+  }
+
   function cancelManagement() {
     if (!document.body.classList.contains('managing')) return;
     var cancel = browse.querySelector('.manage-bar [data-cancel]');
@@ -143,7 +243,10 @@
     // deliberate new query (including Cancel). Partial DOM is not that target.
     if (!append && changeAddress) recoveryView = null;
     currentQuery = query;
-    if (!append) searchPages = 1;
+    if (!append) {
+      searchPages = 1;
+      resetNativeTitle(query);
+    }
     if (disclosure && query) disclosure.open = true;
     if (!query) {
       panel.hidden = true; browse.hidden = false;
@@ -238,6 +341,12 @@
     if (!more.disabled && more.dataset.cursor) {
       stopRestoring(); run(currentQuery, true, false);
     }
+  });
+  if (nativeTitleButton) nativeTitleButton.addEventListener('click', function () {
+    runNativeTitle(false);
+  });
+  if (nativeTitleMore) nativeTitleMore.addEventListener('click', function () {
+    runNativeTitle(true);
   });
   async function restoreView(view) {
     var query = normalizeQuery(new URL(location.href).searchParams.get('q') || '');

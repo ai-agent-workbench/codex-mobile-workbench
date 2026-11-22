@@ -8,9 +8,9 @@
 
 2026-10-26 从官方 `openai/codex` 对应版本标签读取 LICENSE 和 NOTICE，核对 Git blob；同时读取 `@openai/codex` npm 对应版本元数据（均声明 Apache-2.0）并验证下载包的 npm SHA-512 integrity。具体来源和刷新时间见 `third_party/codex/upstream-sources.json`；逐文件对应、用途、哈希与摘录／变更说明见 `third_party/codex/fixture-provenance.json`。npm CLI wrapper 包本身未附 LICENSE／NOTICE，因此此候选补充了对应官方仓库标签的两份原文，而不是声称 NOTICE 不存在。
 
-所涉精确版本：0.151.0-alpha.7.2、0.152.1、0.153.1、0.154.0、0.156.0、0.159.2、0.160.0；原文位于 `third_party/codex/`。早期0.151协议摘要实际记录的是 **0.151.0-alpha.7.2，不是0.151.0正式版**。已由2026-09-01原适配提交与当时验收记录补足来源：桌面提供的WSL App Server生成／核对稳定及实验schema哈希；本轮另核实精确alpha版本的npm归档完整性与官方GitHub标签LICENSE／NOTICE。原二进制／完整schema转储未在本候选分发，也未在本轮重新生成；不把相邻正式版的许可文件当作精确版本取证。历史人工复制源码／模板／素材的总体确认仍单独保留，不因技术来源补证而作法律担保。
+所涉精确版本：0.151.0-alpha.7.2、0.152.1、0.153.1、0.154.0、0.156.0、0.159.2、0.160.0、0.171.0；原文位于 `third_party/codex/`。早期0.151协议摘要实际记录的是 **0.151.0-alpha.7.2，不是0.151.0正式版**。已由2026-09-01原适配提交与当时验收记录补足来源：桌面提供的WSL App Server生成／核对稳定及实验schema哈希；本轮另核实精确alpha版本的npm归档完整性与官方GitHub标签LICENSE／NOTICE。原二进制／完整schema转储未在本候选分发，也未在本轮重新生成；不把相邻正式版的许可文件当作精确版本取证。历史人工复制源码／模板／素材的总体确认仍单独保留，不因技术来源补证而作法律担保。
 
-安装器使用固定官方 Codex 0.160.0 Linux x86-64 musl **完整运行包**，归档及全部成员的固定大小／校验值见 `shared/instance_native.py` 和[原生运行包来源记录](third_party/codex/runtime-package-0.160.0.json)。按官方布局保留 CLI、code-mode host、辅助工具、可选资源及其 NOTICE／许可证（含可选语音资源的 LGPL 等独立许可证）；我们的 MIT 声明不改变这些上游组件的许可，保留资源不等于启用该功能。本源码候选**不携带这些原生二进制或共享库**，安装时由用户从官方获得。若未来把原生二进制、离线wheels或完整runtime一起分发，应重新复核该实际成品内全部组件及其NOTICE／源码义务，不能沿用本声明假称已审完。
+安装器使用固定官方 Codex 0.171.0 Linux x86-64 musl **完整运行包**；升级过渡与恢复可校验 0.160.0。归档及全部成员的固定大小／校验值见 `shared/instance_native.py` 和两份原生运行包来源记录：[0.171.0](third_party/codex/runtime-package-0.171.0.json)、[0.160.0](third_party/codex/runtime-package-0.160.0.json)。0.171.0 的 LICENSE／NOTICE 也从对应官方标签核对 Git blob。按官方布局保留 CLI、code-mode host、辅助工具、可选资源及其 NOTICE／许可证（含可选语音资源的 LGPL 等独立许可证）；我们的 MIT 声明不改变这些上游组件的许可，保留资源不等于启用该功能。本源码候选**不携带这些原生二进制或共享库**，安装时由用户从官方获得。若未来把原生二进制、离线wheels或完整runtime一起分发，应重新复核该实际成品内全部组件及其NOTICE／源码义务，不能沿用本声明假称已审完。
 
 ## Python依赖
 

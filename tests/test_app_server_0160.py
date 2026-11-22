@@ -6,7 +6,6 @@ import unittest
 from engine.codex_app_server import (
     AppServerProtocolError,
     CodexAppServerClient,
-    PROTOCOL_FIXTURE,
     PROTOCOL_FIXTURE_0_156_0,
     PROTOCOL_FIXTURE_0_159_2,
     PROTOCOL_FIXTURE_0_160_0,
@@ -20,8 +19,7 @@ from tests.test_codex_app_server_protocol_20260822 import (
 
 
 class Runtime160Tests(unittest.IsolatedAsyncioTestCase):
-    def test_fixture_is_default_and_preserves_159_contract(self):
-        self.assertEqual(PROTOCOL_FIXTURE, PROTOCOL_FIXTURE_0_160_0)
+    def test_fallback_fixture_preserves_159_contract(self):
         self.assertIn(PROTOCOL_FIXTURE_0_160_0, PROTOCOL_FIXTURES)
         value = json.loads(PROTOCOL_FIXTURE_0_160_0.read_text())
         previous = json.loads(PROTOCOL_FIXTURE_0_159_2.read_text())
